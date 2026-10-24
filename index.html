@@ -103,6 +103,9 @@ textarea{width:100%;min-height:180px;border:1px solid var(--line);border-radius:
 .lrow:first-child{border-top:none}
 .lrow .t{font-family:var(--f-mono);font-size:13px;width:58px;flex:none;font-variant-numeric:tabular-nums;color:var(--muted)}
 .lrow .nudge{border:1px solid var(--line);background:none;color:var(--ink);border-radius:6px;width:30px;height:28px;cursor:pointer;flex:none}
+.lrow .tin{width:84px;flex:none;font-family:var(--f-mono);font-size:16px;font-variant-numeric:tabular-nums;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);padding:5px 6px;text-align:center}
+.lrow .tin.bad{border-color:var(--off);color:var(--off)}
+.lrow .now{width:auto;padding:0 8px;font-size:13px}
 .lrow .x{flex:1;min-width:0;cursor:pointer;overflow-wrap:anywhere}
 .lrow.cur .x{font-weight:700;color:var(--amber)}
 .prog{height:6px;background:var(--line);border-radius:3px;overflow:hidden}
@@ -237,7 +240,7 @@ input[type=file]{font:inherit;font-size:14px;max-width:100%}
       <button class="btn" id="tapStop">그만 맞추기</button>
     </div>
     <div class="list" id="lyList" hidden></div>
-    <p class="note" id="lyListNote" hidden>시간 옆 −/+로 0.2초씩 당기거나 미뤄요. 가사를 누르면 그 줄부터 들려줘요.</p>
+    <p class="note" id="lyListNote" hidden>시간 칸을 눌러 1:51 또는 1:51.5처럼 직접 고칠 수 있어요(151이나 1.51로 써도 1분 51초). "지금"을 누르면 지금 재생 위치가 그 줄의 시작이 돼요. 가사를 누르면 그 줄부터 들려줘요.</p>
   </section>
 </div>
 <div class="sheet" id="sheet" hidden role="dialog" aria-label="가사창">
@@ -670,19 +673,35 @@ $('tapStart').onclick = () => {
 function updTap() { $('tapInfo').textContent = tapIdx < ly.lines.length ? '다음 줄 (' + (tapIdx + 1) + '/' + ly.lines.length + '): ' + ly.lines[tapIdx] : '모든 줄을 맞췄어요.'; $('tapBtn').disabled = tapIdx >= ly.lines.length; }
 $('tapBtn').onclick = () => { if (tapIdx < ly.lines.length) { ly.times[tapIdx] = +Math.max(0, cur() - 0.15).toFixed(2); tapIdx++; saveLy(); updTap(); } };
 $('tapStop').onclick = () => { tapIdx = -1; $('tapBox').hidden = true; saveLy(); };
+function parseTime(s) {
+  s = String(s).trim().replace(/\s+/g, '').replace('초', '');
+  if (!s) return null;
+  let m;
+  if ((m = s.match(/^(\d+)분(\d+(?:\.\d+)?)?$/))) return (+m[2] || 0) < 60 ? +m[1] * 60 + (+m[2] || 0) : null;
+  if ((m = s.match(/^(\d+)[:：](\d{1,2}(?:\.\d+)?)$/))) return +m[2] < 60 ? +m[1] * 60 + +m[2] : null;
+  if ((m = s.match(/^(\d)\.(\d{2})$/)) && +m[2] < 60) return +m[1] * 60 + +m[2];
+  if ((m = s.match(/^(\d)(\d{2})$/)) && +m[2] < 60) return +m[1] * 60 + +m[2];
+  if (/^\d+(\.\d+)?$/.test(s)) return +s;
+  return null;
+}
 function renderLyList() {
   const L = $('lyList'); L.textContent = '';
   L.hidden = !ly.lines.length; $('lyListNote').hidden = !ly.lines.length;
   ly.lines.forEach((line, i) => {
     const row = document.createElement('div'); row.className = 'lrow'; row.dataset.i = i;
-    const t = document.createElement('span'); t.className = 't'; t.textContent = fmt1(ly.times[i] || 0);
-    const m = document.createElement('button'); m.className = 'nudge'; m.textContent = '−'; m.setAttribute('aria-label', '0.2초 당기기');
-    const p = document.createElement('button'); p.className = 'nudge'; p.textContent = '+'; p.setAttribute('aria-label', '0.2초 미루기');
-    m.onclick = () => { ly.times[i] = +Math.max(0, ly.times[i] - 0.2).toFixed(2); saveLy(); };
-    p.onclick = () => { ly.times[i] = +(ly.times[i] + 0.2).toFixed(2); saveLy(); };
+    const t = document.createElement('input'); t.className = 'tin'; t.type = 'text'; t.inputMode = 'decimal'; t.value = fmt1(ly.times[i] || 0); t.id = 'lt' + i; t.setAttribute('aria-label', (i + 1) + '번째 줄 시작 시간');
+    t.onfocus = () => t.select();
+    t.onkeydown = e => { if (e.key === 'Enter') t.blur(); };
+    t.onchange = () => {
+      const v = parseTime(t.value);
+      if (v == null || v < 0 || v > DUR) { t.classList.add('bad'); setTimeout(() => t.classList.remove('bad'), 1200); t.value = fmt1(ly.times[i] || 0); return; }
+      ly.times[i] = +v.toFixed(2); saveLy(); setTimeout(() => { const n = $('lt' + i); if (n) n.focus({ preventScroll: true }); }, 0);
+    };
+    const now = document.createElement('button'); now.className = 'nudge now'; now.textContent = '지금'; now.setAttribute('aria-label', '지금 재생 위치를 이 줄의 시작으로');
+    now.onclick = () => { ly.times[i] = +Math.max(0, cur() - 0.15).toFixed(2); saveLy(); };
     const x = document.createElement('span'); x.className = 'x'; x.textContent = line;
     x.onclick = () => { seekTo((ly.times[i] || 0) - 1); if (!playing) setPlaying(true); };
-    row.append(t, m, p, x); L.appendChild(row);
+    row.append(t, now, x); L.appendChild(row);
   });
 }
 renderLyList();
