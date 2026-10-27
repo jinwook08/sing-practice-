@@ -31,7 +31,7 @@ h1{font-family:var(--f-display);font-weight:400;font-size:34px;line-height:1;mar
 .stage{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
 canvas#roll{display:block;width:100%;height:240px;touch-action:pan-y}
 .lyr{padding:12px 16px 14px;border-top:1px solid var(--line);min-height:76px}
-#lyNow{font-size:20px;font-weight:700;line-height:1.35;text-wrap:balance}
+#lyNow{font-size:20px;font-weight:700;line-height:1.9;text-wrap:balance}
 #lyNext{color:var(--muted);font-size:14px;margin-top:2px}
 .lyr .hint{color:var(--muted);font-size:14px}
 .readout{display:flex;gap:16px;flex-wrap:wrap;padding:10px 16px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
@@ -64,7 +64,7 @@ label.btn{display:inline-block}
 .sheet-body{flex:1;overflow-y:auto;padding-top:12px;padding-bottom:calc(40vh + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .sl{display:flex;gap:12px;align-items:baseline;padding:10px 8px;border-radius:10px;cursor:pointer}
 .sl .t{font-family:var(--f-mono);font-size:12px;color:var(--muted);flex:none;width:40px;font-variant-numeric:tabular-nums}
-.sl .x{flex:1;min-width:0;font-size:20px;line-height:1.6;overflow-wrap:anywhere;color:var(--muted)}
+.sl .x{flex:1;min-width:0;font-size:20px;line-height:2.3;overflow-wrap:anywhere;color:var(--muted)}
 .sl.cur{background:var(--amber-soft)} .sl.cur .x{color:var(--ink);font-weight:700}
 .sl.inloop{outline:2px solid var(--amber)}
 .marking .sl .ch{cursor:pointer;border-radius:4px}
@@ -75,6 +75,25 @@ label.btn{display:inline-block}
 .jump span{font-family:var(--f-mono);font-size:12px;color:var(--muted);margin-left:4px}
 .jump:active{background:var(--amber-soft)}
 #lyBox{cursor:pointer}
+.tools{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.tool{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:7px 12px;font:inherit;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.tool b{color:var(--amber);font-size:16px;line-height:1}
+.tool[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.dot{width:14px;height:14px;border-radius:50%;display:inline-block;border:1px solid var(--line)}
+.d-amber{background:var(--amber)} .d-red{background:var(--off)} .d-blue{background:#3F7BD9} .d-ink{background:var(--ink)}
+.sl{position:relative}
+canvas.ink{position:absolute;left:0;top:0;pointer-events:none;touch-action:pan-y;z-index:3}
+.inking canvas.ink{pointer-events:auto}
+.finger canvas.ink{touch-action:none}
+.ch.mk{position:relative}
+.ch.mk::before{content:attr(data-m);position:absolute;left:50%;transform:translateX(-50%);top:-1em;font-size:.82em;line-height:1;color:var(--amber);font-weight:700;white-space:nowrap;pointer-events:none}
+.page{position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.page img{display:block;width:100%;height:auto;max-width:100%}
+.stamps{position:absolute;inset:0;z-index:4;pointer-events:none}
+.stamp{position:absolute;transform:translate(-50%,-50%);border:none;background:none;color:var(--off);font:inherit;font-size:24px;font-weight:700;line-height:1;padding:2px;pointer-events:none}
+.marking .stamp{pointer-events:auto;cursor:pointer}
+.marking .page{cursor:crosshair}
+.pagebar{justify-content:space-between;margin:12px 0 6px}
 .chip{display:inline-flex;align-items:center;gap:6px;font-size:13px;background:var(--amber-soft);color:var(--ink);padding:4px 10px;border-radius:999px}
 .chip button{border:none;background:none;color:inherit;cursor:pointer;font-size:15px;padding:0 2px}
 .tabs{display:flex;border-bottom:1px solid var(--line);gap:4px}
@@ -252,14 +271,41 @@ input[type=file]{font:inherit;font-size:14px;max-width:100%}
       <button class="btn" id="shClose">닫기</button>
     </div>
     <div class="row">
-      <button class="btn" id="shPrev">◀</button>
+      <div class="seg" role="group" aria-label="보기"><button id="vLyr" aria-pressed="true">가사</button><button id="vScore" aria-pressed="false">악보</button></div>
+      <button class="btn" id="shPrev" aria-label="이전 줄">◀</button>
       <button class="btn primary" id="shLoop">이 줄 반복</button>
-      <button class="btn" id="shNext">▶</button>
-      <label class="check"><input type="checkbox" id="shMark"> 숨표 찍기</label>
+      <button class="btn" id="shNext" aria-label="다음 줄">▶</button>
     </div>
-    <p class="note" id="shHint">줄을 누르면 그 줄부터 들려줘요. "숨표 찍기"를 켜고 글자를 누르면 그 뒤에 숨 쉬는 표시(V)가 생기고, 한 번 더 누르면 지워져요.</p>
+    <div class="row">
+      <div class="seg" role="group" aria-label="도구"><button id="mView" aria-pressed="true">보기</button><button id="mSym" aria-pressed="false">기호</button><button id="mPen" aria-pressed="false">펜</button></div>
+    </div>
+    <div class="tools" id="symBar" hidden>
+      <button class="tool" data-s="br" aria-pressed="true"><b>V</b>숨</button>
+      <button class="tool" data-s="vib" aria-pressed="false"><b>〰</b>비브라토</button>
+      <button class="tool" data-s="up" aria-pressed="false"><b>↗</b>위로 밴딩</button>
+      <button class="tool" data-s="dn" aria-pressed="false"><b>↘</b>아래로 밴딩</button>
+      <button class="tool" data-s="cre" aria-pressed="false"><b>&lt;</b>점점 크게</button>
+      <button class="tool" data-s="dim" aria-pressed="false"><b>&gt;</b>점점 작게</button>
+    </div>
+    <div class="tools" id="penBar" hidden>
+      <button class="tool" data-c="amber" aria-pressed="true"><i class="dot d-amber"></i>노랑</button>
+      <button class="tool" data-c="red" aria-pressed="false"><i class="dot d-red"></i>빨강</button>
+      <button class="tool" data-c="blue" aria-pressed="false"><i class="dot d-blue"></i>파랑</button>
+      <button class="tool" data-c="ink" aria-pressed="false"><i class="dot d-ink"></i>검정</button>
+      <button class="tool" id="eraser" aria-pressed="false">지우개</button>
+      <button class="tool" id="undoBtn">되돌리기</button>
+      <button class="tool" id="fingerTgl" aria-pressed="false">손가락 쓰기</button>
+      <button class="tool" id="clearInk">필기 모두 지우기</button>
+    </div>
+    <p class="note" id="shHint"></p>
   </div>
   <div class="sheet-body" id="shBody"></div>
+  <div class="sheet-body" id="scoreBody" hidden>
+    <div class="row"><label class="btn primary" for="addScore">악보 사진 추가</label></div>
+    <input type="file" id="addScore" class="vh" accept="image/*" multiple>
+    <p class="note" id="scoreEmpty">악보를 사진이나 스크린샷으로 올리면 그 위에 펜으로 쓰고 기호를 찍을 수 있어요. PDF는 화면을 캡처해서 올려 주세요. 사진은 이 기기에만 저장돼요.</p>
+    <div id="scorePages"></div>
+  </div>
 </div>
 
 <script>
@@ -629,6 +675,7 @@ $('map').onclick = e => { const r = e.currentTarget.getBoundingClientRect(); see
 /* ---------- lyrics ---------- */
 let ly = store.get('ibyeol-lyrics-v1') || { lines: [], times: [] };
 if (!ly.breaths) ly.breaths = ly.lines.map(() => []);
+if (!ly.marks) ly.marks = ly.lines.map(() => ({}));
 function autoTimes(n) {
   const out = [], K = PHR.length;
   for (let i = 0; i < n; i++) { const pos = i * K / n, k = Math.floor(pos), fr = pos - k; out.push(+(PHR[k][0] + fr * (PHR[k][1] - PHR[k][0])).toFixed(2)); }
@@ -666,24 +713,25 @@ function smartTimes(lines) {
   return st.map(k => +(T[k] - 0.05).toFixed(2));
 }
 function saveLy() { store.set('ibyeol-lyrics-v1', ly); renderLyList(); renderSheet(); lastLy = -2; $('lineBar').hidden = !ly.lines.length; }
+function keepMarks(lines) { const old = {}; ly.lines.forEach((l, i) => { if (!(l in old)) old[l] = (ly.marks && ly.marks[i]) || {}; }); return lines.map(l => Object.assign({}, old[l] || {})); }
 function keepBreaths(lines) { const old = {}; ly.lines.forEach((l, i) => { if (!(l in old)) old[l] = ly.breaths[i] || []; }); return lines.map(l => (old[l] || []).slice()); }
 function lyIndex(t) { let k = -1; for (let i = 0; i < ly.times.length; i++) if (ly.times[i] <= t + 0.05) k = i; return k; }
 function lyricAt(t) { const k = lyIndex(t); return k >= 0 ? ly.lines[k] : ''; }
 $('lyText').value = ly.lines.join('\n');
 $('lyApply').onclick = () => {
   const lines = $('lyText').value.split('\n').map(s => s.trim()).filter(Boolean);
-  ly = { lines, times: smartTimes(lines), breaths: keepBreaths(lines) }; saveLy();
+  ly = { lines, times: smartTimes(lines), breaths: keepBreaths(lines), marks: keepMarks(lines) }; saveLy();
 };
 let clearArm = false;
 $('lyClear').onclick = () => {
   if (!clearArm) { clearArm = true; $('lyClear').textContent = '정말 지울까요? 한 번 더 누르세요'; setTimeout(() => { clearArm = false; $('lyClear').textContent = '가사 지우기'; }, 3000); return; }
-  clearArm = false; $('lyClear').textContent = '가사 지우기'; ly = { lines: [], times: [], breaths: [] }; $('lyText').value = ''; saveLy();
+  clearArm = false; $('lyClear').textContent = '가사 지우기'; ly = { lines: [], times: [], breaths: [], marks: [] }; $('lyText').value = ''; saveLy();
 };
 let tapIdx = -1;
 $('tapStart').onclick = () => {
   const lines = $('lyText').value.split('\n').map(s => s.trim()).filter(Boolean);
   if (!lines.length) { $('lyText').focus(); return; }
-  if (lines.join('\n') !== ly.lines.join('\n')) ly = { lines, times: smartTimes(lines), breaths: keepBreaths(lines) };
+  if (lines.join('\n') !== ly.lines.join('\n')) ly = { lines, times: smartTimes(lines), breaths: keepBreaths(lines), marks: keepMarks(lines) };
   tapIdx = 0; $('tapBox').hidden = false; updTap();
   setPlaying(false); seekTo(Math.max(0, (ly.times[0] || 30) - 6)); setPlaying(true);
 };
@@ -736,9 +784,11 @@ function updLyrics(t) {
 /* ---------- line practice + lyric sheet ---------- */
 function renderLine(el, i) {
   el.textContent = '';
-  const set = new Set(ly.breaths[i] || []);
+  const set = new Set(ly.breaths[i] || []), mk = (ly.marks && ly.marks[i]) || {};
   Array.from(ly.lines[i]).forEach((ch, k) => {
-    const s = document.createElement('span'); s.className = 'ch'; s.dataset.k = k; s.textContent = ch; el.appendChild(s);
+    const s = document.createElement('span'); s.className = 'ch'; s.dataset.k = k; s.textContent = ch;
+    if (mk[k] && SYMS[mk[k]]) { s.classList.add('mk'); s.dataset.m = SYMS[mk[k]].g; s.title = SYMS[mk[k]].n; }
+    el.appendChild(s);
     if (set.has(k)) { const b = document.createElement('span'); b.className = 'br'; b.textContent = 'V'; b.title = '숨'; el.appendChild(b); }
   });
 }
@@ -765,30 +815,207 @@ $('lnLoop').onclick = $('shLoop').onclick = toggleLineLoop;
 $('lnPrev').onclick = $('shPrev').onclick = () => stepLine(-1);
 $('lnNext').onclick = $('shNext').onclick = () => stepLine(1);
 $('altMode').onchange = () => { if (!audios.ar._has && $('altMode').checked) { $('altMode').checked = false; $('setup').dataset.open = '1'; $('setup').hidden = false; $('loadTxt').textContent = '원곡 파일을 고르면 쓸 수 있어요.'; return; } if (loop && loop.line >= 0) loopLine(loop.line); };
+/* ---- marks, ink, score ---- */
+const SYMS = { br: { g: 'V', n: '숨' }, vib: { g: '〰', n: '비브라토' }, up: { g: '↗', n: '위로 밴딩' }, dn: { g: '↘', n: '아래로 밴딩' }, cre: { g: '<', n: '점점 크게' }, dim: { g: '>', n: '점점 작게' } };
+let shMode = 'view', shView = 'lyrics', curSym = 'br', penColor = 'amber', penTool = 'pen', fingerDraw = false;
+let inkStore = store.get('ibyeol-ink-v1') || {};
+let scoreBlobs = [], scoreUrls = [];
+const undoStack = [];
+function saveInk() { store.set('ibyeol-ink-v1', inkStore); }
+function inkKey(i) { let n = 0; for (let j = 0; j < i; j++) if (ly.lines[j] === ly.lines[i]) n++; return 'L:' + ly.lines[i] + '#' + n; }
+function penCss() { return { amber: col.amber, red: col.off, blue: '#3F7BD9', ink: col.ink }[penColor] || col.amber; }
+
+function setShMode(m) {
+  shMode = m;
+  for (const [id, v] of [['mView', 'view'], ['mSym', 'sym'], ['mPen', 'pen']]) $(id).setAttribute('aria-pressed', String(v === m));
+  $('symBar').hidden = m !== 'sym'; $('penBar').hidden = m !== 'pen';
+  $('sheet').classList.toggle('marking', m === 'sym');
+  $('sheet').classList.toggle('inking', m === 'pen');
+  $('sheet').classList.toggle('finger', m === 'pen' && fingerDraw);
+  $('shHint').textContent = m === 'view' ? '줄을 누르면 그 줄부터 들려줘요. 기호나 펜을 고르면 가사와 악보에 표시할 수 있어요.'
+    : m === 'sym' ? (shView === 'lyrics' ? '기호를 고르고 글자를 누르면 그 글자에 붙어요. 같은 기호를 한 번 더 누르면 지워져요.' : '기호를 고르고 악보 위를 누르면 그 자리에 찍혀요. 찍힌 기호를 누르면 지워져요.')
+    : '펜슬로 바로 쓰면 돼요. 손가락으로는 화면이 넘어가요. 손가락으로도 쓰려면 "손가락 쓰기"를 켜세요.';
+}
+$('mView').onclick = () => setShMode('view');
+$('mSym').onclick = () => setShMode('sym');
+$('mPen').onclick = () => setShMode('pen');
+document.querySelectorAll('#symBar [data-s]').forEach(b => b.onclick = () => { curSym = b.dataset.s; document.querySelectorAll('#symBar [data-s]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); });
+document.querySelectorAll('#penBar [data-c]').forEach(b => b.onclick = () => { penColor = b.dataset.c; penTool = 'pen'; updPenBar(); });
+$('eraser').onclick = () => { penTool = penTool === 'eraser' ? 'pen' : 'eraser'; updPenBar(); };
+$('fingerTgl').onclick = () => { fingerDraw = !fingerDraw; updPenBar(); setShMode('pen'); };
+function updPenBar() {
+  document.querySelectorAll('#penBar [data-c]').forEach(x => x.setAttribute('aria-pressed', String(penTool === 'pen' && x.dataset.c === penColor)));
+  $('eraser').setAttribute('aria-pressed', String(penTool === 'eraser'));
+  $('fingerTgl').setAttribute('aria-pressed', String(fingerDraw));
+}
+$('undoBtn').onclick = () => {
+  const u = undoStack.pop(); if (!u) return;
+  const arr = inkStore[u.key] || (inkStore[u.key] = []);
+  if (u.type === 'add') { const at = arr.indexOf(u.st); if (at >= 0) arr.splice(at, 1); } else arr.splice(Math.min(u.idx, arr.length), 0, u.st);
+  saveInk(); redrawAll();
+};
+for (const [id, v] of [['vLyr', 'lyrics'], ['vScore', 'score']]) $(id).onclick = () => { shView = v; $('vLyr').setAttribute('aria-pressed', String(v === 'lyrics')); $('vScore').setAttribute('aria-pressed', String(v === 'score')); $('shBody').hidden = v !== 'lyrics'; $('scoreBody').hidden = v !== 'score'; setShMode(shMode); if (v === 'score') renderScore(); else renderSheet(); };
+
+/* one canvas per lyric row or score page; strokes stored per key */
+function attachInk(host, key, norm) {
+  const cv2 = document.createElement('canvas'); cv2.className = 'ink'; host.appendChild(cv2);
+  cv2._key = key; cv2._norm = norm; cv2._host = host;
+  sizeInk(cv2);
+  let st = null, pid = null;
+  const pt = e => { const r = cv2.getBoundingClientRect(); let x = e.clientX - r.left, y = e.clientY - r.top; if (norm) { x /= r.width; y /= r.height; } const p = e.pointerType === 'pen' ? (e.pressure || 0.5) : 0.5; return [+x.toFixed(norm ? 4 : 1), +y.toFixed(norm ? 4 : 1), +p.toFixed(2)]; };
+  cv2.addEventListener('touchstart', e => { if (shMode === 'pen' && [...e.touches].some(t => t.touchType === 'stylus')) e.preventDefault(); }, { passive: false });
+  cv2.addEventListener('touchmove', e => { if (shMode === 'pen' && [...e.touches].some(t => t.touchType === 'stylus')) e.preventDefault(); }, { passive: false });
+  cv2.addEventListener('pointerdown', e => {
+    if (shMode !== 'pen') return;
+    if (e.pointerType === 'touch' && !fingerDraw) return;
+    e.preventDefault(); e.stopPropagation(); pid = e.pointerId; try { cv2.setPointerCapture(pid); } catch (er) {}
+    if (penTool === 'eraser') { eraseAt(cv2, pt(e)); st = 'erase'; return; }
+    st = { c: penColor, w: norm ? 0.004 : 3, p: [pt(e)] };
+  });
+  cv2.addEventListener('pointermove', e => {
+    if (!st || e.pointerId !== pid) return;
+    e.preventDefault();
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    if (st === 'erase') { for (const ev of evs) eraseAt(cv2, pt(ev)); return; }
+    for (const ev of evs) st.p.push(pt(ev));
+    drawInk(cv2, [st], true);
+  });
+  const end = e => {
+    if (!st || e.pointerId !== pid) return;
+    if (st !== 'erase' && st.p.length > 1) { const arr = inkStore[key] || (inkStore[key] = []); arr.push(st); undoStack.push({ type: 'add', key, st }); saveInk(); }
+    st = null; pid = null; drawInk(cv2);
+  };
+  cv2.addEventListener('pointerup', end); cv2.addEventListener('pointercancel', end);
+  cv2.addEventListener('click', e => { if (shMode === 'pen') e.stopPropagation(); });
+  return cv2;
+}
+function sizeInk(cv2) {
+  const r = cv2._host.getBoundingClientRect(), d = devicePixelRatio || 1;
+  cv2.width = Math.max(1, r.width * d); cv2.height = Math.max(1, r.height * d);
+  cv2.style.width = r.width + 'px'; cv2.style.height = r.height + 'px';
+  drawInk(cv2);
+}
+function drawInk(cv2, extra, keep) {
+  const g2 = cv2.getContext('2d'), d = devicePixelRatio || 1, W2 = cv2.width / d, H2 = cv2.height / d;
+  g2.setTransform(d, 0, 0, d, 0, 0);
+  if (!keep) g2.clearRect(0, 0, W2, H2);
+  const list = keep ? extra : (inkStore[cv2._key] || []).concat(extra || []);
+  const sx = cv2._norm ? W2 : 1, sy = cv2._norm ? H2 : 1;
+  g2.lineCap = 'round'; g2.lineJoin = 'round';
+  for (const s of list) {
+    g2.strokeStyle = { amber: col.amber, red: col.off, blue: '#3F7BD9', ink: col.ink }[s.c] || col.amber;
+    for (let i = 1; i < s.p.length; i++) {
+      const a = s.p[i - 1], b = s.p[i];
+      g2.lineWidth = (cv2._norm ? s.w * W2 : s.w) * (0.6 + b[2] * 0.9);
+      g2.beginPath(); g2.moveTo(a[0] * sx, a[1] * sy); g2.lineTo(b[0] * sx, b[1] * sy); g2.stroke();
+    }
+  }
+}
+function eraseAt(cv2, p) {
+  const arr = inkStore[cv2._key]; if (!arr || !arr.length) return;
+  const r = cv2.getBoundingClientRect(), sx = cv2._norm ? r.width : 1, sy = cv2._norm ? r.height : 1, R = 14;
+  for (let i = arr.length - 1; i >= 0; i--) {
+    if (arr[i].p.some(q => Math.hypot((q[0] - p[0]) * sx, (q[1] - p[1]) * sy) < R)) { undoStack.push({ type: 'del', key: cv2._key, st: arr[i], idx: i }); arr.splice(i, 1); }
+  }
+  saveInk(); drawInk(cv2);
+}
+function redrawAll() { document.querySelectorAll('canvas.ink').forEach(c => drawInk(c)); }
+new ResizeObserver(() => document.querySelectorAll('canvas.ink').forEach(c => sizeInk(c))).observe($('sheet'));
+let clearInkArm = false;
+$('clearInk').onclick = () => {
+  if (!clearInkArm) { clearInkArm = true; $('clearInk').textContent = '한 번 더 누르면 지워요'; setTimeout(() => { clearInkArm = false; $('clearInk').textContent = '필기 모두 지우기'; }, 3000); return; }
+  clearInkArm = false; $('clearInk').textContent = '필기 모두 지우기';
+  const pre = shView === 'lyrics' ? 'L:' : 'S:';
+  for (const k of Object.keys(inkStore)) if (k.startsWith(pre)) delete inkStore[k];
+  saveInk(); redrawAll();
+};
+
+/* score pages (photos of sheet music) kept on this device */
+async function loadScore() { const b = await idbGet('score'); scoreBlobs = Array.isArray(b) ? b : []; }
+function renderScore() {
+  const B = $('scorePages'); B.textContent = '';
+  scoreUrls.forEach(u => URL.revokeObjectURL(u)); scoreUrls = [];
+  $('scoreEmpty').hidden = scoreBlobs.length > 0;
+  scoreBlobs.forEach((blob, n) => {
+    const page = document.createElement('div'); page.className = 'page';
+    const img = document.createElement('img'); const u = URL.createObjectURL(blob); scoreUrls.push(u); img.src = u; img.alt = '악보 ' + (n + 1) + '쪽';
+    page.appendChild(img);
+    const stamps = document.createElement('div'); stamps.className = 'stamps'; page.appendChild(stamps);
+    const key = 'S:' + n;
+    img.onload = () => { const cv2 = attachInk(page, key, true); drawStamps(page, n); };
+    const bar = document.createElement('div'); bar.className = 'row pagebar';
+    const lab = document.createElement('span'); lab.className = 'note'; lab.textContent = (n + 1) + '쪽';
+    const del = document.createElement('button'); del.className = 'btn'; del.textContent = '이 쪽 빼기';
+    let arm = false;
+    del.onclick = async () => { if (!arm) { arm = true; del.textContent = '한 번 더 누르면 빼요'; setTimeout(() => { arm = false; del.textContent = '이 쪽 빼기'; }, 3000); return; } scoreBlobs.splice(n, 1); shiftScoreKeys(n); await idbPut('score', scoreBlobs); renderScore(); };
+    bar.append(lab, del);
+    B.append(bar, page);
+  });
+}
+function shiftScoreKeys(n) {
+  const out = {};
+  for (const [k, v] of Object.entries(inkStore)) { const m = k.match(/^S:(\d+)$/); if (!m) { out[k] = v; continue; } const j = +m[1]; if (j < n) out[k] = v; else if (j > n) out['S:' + (j - 1)] = v; }
+  inkStore = out; saveInk();
+  const st = store.get('ibyeol-stamps-v1') || {}, o2 = {};
+  for (const [k, v] of Object.entries(st)) { const j = +k; if (j < n) o2[j] = v; else if (j > n) o2[j - 1] = v; }
+  store.set('ibyeol-stamps-v1', o2);
+}
+$('addScore').onchange = async e => {
+  const fs = [...e.target.files]; if (!fs.length) return;
+  scoreBlobs = scoreBlobs.concat(fs); await idbPut('score', scoreBlobs); e.target.value = ''; renderScore();
+};
+function drawStamps(page, n) {
+  const box = page.querySelector('.stamps'); box.textContent = '';
+  const all = store.get('ibyeol-stamps-v1') || {};
+  (all[n] || []).forEach((s, idx) => {
+    const el = document.createElement('button'); el.className = 'stamp'; el.textContent = SYMS[s.s] ? SYMS[s.s].g : '?'; el.title = SYMS[s.s] ? SYMS[s.s].n : '';
+    el.style.left = (s.x * 100) + '%'; el.style.top = (s.y * 100) + '%';
+    el.onclick = ev => { if (shMode !== 'sym') return; ev.stopPropagation(); const a = store.get('ibyeol-stamps-v1') || {}; (a[n] || []).splice(idx, 1); store.set('ibyeol-stamps-v1', a); drawStamps(page, n); };
+    box.appendChild(el);
+  });
+}
+$('scorePages').addEventListener('click', e => {
+  if (shMode !== 'sym') return;
+  const page = e.target.closest('.page'); if (!page || e.target.closest('.stamp')) return;
+  const n = [...document.querySelectorAll('#scorePages .page')].indexOf(page), r = page.getBoundingClientRect();
+  const a = store.get('ibyeol-stamps-v1') || {}; (a[n] || (a[n] = [])).push({ s: curSym, x: +((e.clientX - r.left) / r.width).toFixed(4), y: +((e.clientY - r.top) / r.height).toFixed(4) });
+  store.set('ibyeol-stamps-v1', a); drawStamps(page, n);
+});
+
 $('shPlay').onclick = () => setPlaying(!playing);
-function openSheet() { if (!ly.lines.length) { showTab('lyrics'); $('lyText').focus(); return; } $('sheet').hidden = false; document.body.style.overflow = 'hidden'; renderSheet(); sheetLine = -2; markSheet(lyIndex(cur())); }
+async function openSheet() {
+  $('sheet').hidden = false; document.body.style.overflow = 'hidden';
+  await loadScore();
+  if (!ly.lines.length && shView === 'lyrics') { $('vScore').click(); } else if (shView === 'lyrics') renderSheet(); else renderScore();
+  setShMode(shMode); updPenBar(); sheetLine = -2; markSheet(lyIndex(cur()));
+}
 $('openSheet').onclick = $('openSheet2').onclick = openSheet;
 $('shClose').onclick = () => { $('sheet').hidden = true; document.body.style.overflow = ''; };
-$('shMark').onchange = () => $('shBody').classList.toggle('marking', $('shMark').checked);
 function renderSheet() {
-  const B = $('shBody'); if ($('sheet').hidden) return;
+  const B = $('shBody'); if ($('sheet').hidden || shView !== 'lyrics') return;
+  const y = B.scrollTop;
   B.textContent = '';
+  if (!ly.lines.length) { const p = document.createElement('p'); p.className = 'note'; p.textContent = '"가사" 탭에 가사를 붙여넣으면 여기에 나와요.'; B.appendChild(p); return; }
   ly.lines.forEach((l, i) => {
     const r = document.createElement('div'); r.className = 'sl'; r.dataset.i = i;
     const tt = document.createElement('span'); tt.className = 't'; tt.textContent = fmt(ly.times[i] || 0);
     const x = document.createElement('div'); x.className = 'x'; renderLine(x, i);
     r.append(tt, x); B.appendChild(r);
+    attachInk(r, inkKey(i), false);
   });
+  B.scrollTop = y;
   sheetLine = -2; markSheet(lyIndex(cur())); updLoopUI();
 }
 $('shBody').onclick = e => {
   const row = e.target.closest('.sl'); if (!row) return;
   const i = +row.dataset.i;
-  if ($('shMark').checked) {
+  if (shMode === 'pen') return;
+  if (shMode === 'sym') {
     const ch = e.target.closest('.ch'); if (!ch) return;
-    const k = +ch.dataset.k, arr = ly.breaths[i] || (ly.breaths[i] = []), at = arr.indexOf(k);
-    if (at >= 0) arr.splice(at, 1); else { arr.push(k); arr.sort((a, b) => a - b); }
-    const y = $('shBody').scrollTop; saveLy(); $('shBody').scrollTop = y;
+    const k = +ch.dataset.k;
+    if (curSym === 'br') { const arr = ly.breaths[i] || (ly.breaths[i] = []), at = arr.indexOf(k); if (at >= 0) arr.splice(at, 1); else { arr.push(k); arr.sort((a, b) => a - b); } }
+    else { const m = ly.marks[i] || (ly.marks[i] = {}); if (m[k] === curSym) delete m[k]; else m[k] = curSym; }
+    saveLy();
     return;
   }
   if (loop && loop.line >= 0) loopLine(i); else { seekTo(ly.times[i] - 0.8); if (!playing) setPlaying(true); }
@@ -800,7 +1027,7 @@ function markSheet(k) {
   if ($('sheet').hidden || k === sheetLine) return; sheetLine = k;
   document.querySelectorAll('.sl').forEach(r => r.classList.toggle('cur', +r.dataset.i === k));
   const el = document.querySelector('.sl.cur');
-  if (el && Date.now() - lastTouch > 3000) { const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; el.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' }); }
+  if (el && shMode === 'view' && Date.now() - lastTouch > 3000) { const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; el.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' }); }
 }
 $('lineBar').hidden = !ly.lines.length;
 
