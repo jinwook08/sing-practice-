@@ -186,7 +186,7 @@ input[type=file]{font:inherit;font-size:14px;max-width:100%}
     <p><b>처음 한 번만:</b> 폰에 있는 반주 파일을 골라 주세요. MP3 파일이 가장 잘 돼요. 고른 파일은 이 폰에만 저장돼서 다음부터는 바로 열려요.</p>
     <div class="row">
       <label class="btn primary" for="pickMr">MR 파일 고르기</label>
-      <label class="btn" for="pickAr">원곡 파일 고르기 (선택)</label>
+      <label class="btn" for="pickAr">AR(원곡) 파일 고르기 (선택)</label>
     </div>
     <input type="file" id="pickMr" class="vh" accept="audio/*,.wav,.mp3,.m4a">
     <input type="file" id="pickAr" class="vh" accept="audio/*,.wav,.mp3,.m4a">
@@ -201,8 +201,8 @@ input[type=file]{font:inherit;font-size:14px;max-width:100%}
     </div>
     <div class="row">
       <div class="seg" role="group" aria-label="소리">
-        <button id="srcMr" aria-pressed="true">MR</button>
-        <button id="srcAr" aria-pressed="false">원곡</button>
+        <button id="srcMr" aria-pressed="true">MR 반주</button>
+        <button id="srcAr" aria-pressed="false">AR 원곡</button>
         <button id="srcMe" aria-pressed="false" hidden>내 녹음</button>
       </div>
       <span class="chip" id="loopChip" hidden>구간 반복 <span id="loopTxt"></span><button id="loopOff" aria-label="구간 반복 끄기">✕</button></span>
@@ -221,7 +221,7 @@ input[type=file]{font:inherit;font-size:14px;max-width:100%}
     <button class="btn" id="lnPrev" aria-label="이전 줄">◀ 이전 줄</button>
     <button class="btn primary" id="lnLoop">이 줄 반복</button>
     <button class="btn" id="lnNext" aria-label="다음 줄">다음 줄 ▶</button>
-    <label class="check"><input type="checkbox" id="altMode"> 원곡 듣고 → 내가 부르기</label>
+    <label class="check"><input type="checkbox" id="altMode"> AR 듣고 → MR로 부르기</label>
     <button class="btn" id="openSheet">가사창 (숨표)</button>
   </div>
 
@@ -306,6 +306,7 @@ input[type=file]{font:inherit;font-size:14px;max-width:100%}
     </div>
     <div class="row">
       <div class="seg" role="group" aria-label="보기"><button id="vLyr" aria-pressed="true">가사</button><button id="vScore" aria-pressed="false">악보</button></div>
+      <div class="seg" role="group" aria-label="소리"><button id="shMr" aria-pressed="true">MR</button><button id="shAr" aria-pressed="false">AR</button></div>
       <button class="btn" id="shPrev" aria-label="이전 줄">◀</button>
       <button class="btn primary" id="shLoop">이 줄 반복</button>
       <button class="btn" id="shNext" aria-label="다음 줄">▶</button>
@@ -417,17 +418,19 @@ function seekTo(t) {
 }
 function setSrc(k, at) {
   if (!audios[k]) return;
-  if (k !== 'me' && !audios[k]._has) { $('setup').dataset.open = '1'; $('setup').hidden = false; $('setup').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+  if (k !== 'me' && !audios[k]._has) { if (!$('sheet').hidden) { shToast('이 기기에 ' + (k === 'ar' ? 'AR(원곡)' : 'MR') + ' 파일이 없어요'); return; } $('setup').dataset.open = '1'; $('setup').hidden = false; $('setup').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
   const t = at != null ? at : cur(), was = playing;
   if (playing) { audios[src].pause(); playing = false; }
   src = k; viewT = t;
-  for (const [id, kk] of [['srcMr', 'mr'], ['srcAr', 'ar'], ['srcMe', 'me']]) $(id).setAttribute('aria-pressed', String(kk === k));
+  for (const [id, kk] of [['srcMr', 'mr'], ['srcAr', 'ar'], ['srcMe', 'me'], ['shMr', 'mr'], ['shAr', 'ar']]) $(id).setAttribute('aria-pressed', String(kk === k));
   if (was) setPlaying(true);
 }
 $('playBtn').onclick = () => setPlaying(!playing);
 $('srcMr').onclick = () => setSrc('mr');
 $('srcAr').onclick = () => setSrc('ar');
 $('srcMe').onclick = () => setSrc('me');
+$('shMr').onclick = () => setSrc('mr');
+$('shAr').onclick = () => { if (!audios.ar._has) { if (!$('sheet').hidden) shToast('이 기기에 AR(원곡) 파일이 없어요. 메인 화면의 "반주 파일 바꾸기"에서 골라 주세요'); return; } setSrc('ar'); };
 $('seek').oninput = e => seekTo(+e.target.value);
 document.addEventListener('keydown', e => { if (e.code === 'Space' && !/TEXTAREA|INPUT|BUTTON/.test(e.target.tagName)) { e.preventDefault(); setPlaying(!playing); } });
 let lock = null;
@@ -1430,7 +1433,7 @@ async function initCloud() {
 initCloud();
 
 /* ---------- new version check (hosted) ---------- */
-const BUILD = '1793175662';
+const BUILD = '1793175876';
 async function checkUpdate() {
   if (!HOSTED) return;
   try {
