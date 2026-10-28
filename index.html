@@ -8,6 +8,7 @@
   --bg:#EDF0F4; --surface:#FFFFFF; --ink:#17202C; --muted:#5A6576; --line:#D3D9E2;
   --amber:#B87800; --amber-soft:#F6D58A; --good:#1B8653; --off:#CC4325; --roll:#E2E7EE; --roll-key:#D6DCE5;
   --note:#E9A825; --note-now:#B87800;
+  --c-br:#2463D6; --c-vib:#8443D1; --c-bend:#D0461F; --c-vol:#16834F;
   --f-display:"Do Hyeon","IBM Plex Sans KR",system-ui,sans-serif;
   --f-body:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
@@ -15,11 +16,11 @@
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0D121A; --surface:#151C27; --ink:#E7EBF1; --muted:#8C98AA; --line:#253041;
   --amber:#F4B52C; --amber-soft:#5A4413; --good:#3ECB87; --off:#FF6A4A; --roll:#101721; --roll-key:#0B1119;
-  --note:#8A6417; --note-now:#F4B52C; color-scheme:dark}}
+  --note:#8A6417; --note-now:#F4B52C; --c-br:#6FA3FF; --c-vib:#B98CFF; --c-bend:#FF7B5A; --c-vol:#43CF8B; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0D121A; --surface:#151C27; --ink:#E7EBF1; --muted:#8C98AA; --line:#253041;
   --amber:#F4B52C; --amber-soft:#5A4413; --good:#3ECB87; --off:#FF6A4A; --roll:#101721; --roll-key:#0B1119;
-  --note:#8A6417; --note-now:#F4B52C; color-scheme:dark}
+  --note:#8A6417; --note-now:#F4B52C; --c-br:#6FA3FF; --c-vib:#B98CFF; --c-bend:#FF7B5A; --c-vol:#43CF8B; color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55}
@@ -118,6 +119,21 @@ canvas.mel{display:block;width:100%;height:50px}
 .gpage{padding:6px 0}
 .xfer{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px;margin-top:4px}
 #xferBox{min-height:90px}
+.br{color:var(--c-br)!important}
+.ch.mk[data-s="vib"]::before{color:var(--c-vib)}
+.ch.mk[data-s="up"]::before,.ch.mk[data-s="dn"]::before{color:var(--c-bend)}
+.ch.mk[data-s="cre"]::before,.ch.mk[data-s="dim"]::before{color:var(--c-vol)}
+.tool[data-s="br"] b{color:var(--c-br)} .tool[data-s="vib"] b{color:var(--c-vib)}
+.tool[data-s="up"] b,.tool[data-s="dn"] b{color:var(--c-bend)} .tool[data-s="cre"] b,.tool[data-s="dim"] b{color:var(--c-vol)}
+.stamp.s-br{color:var(--c-br)} .stamp.s-vib{color:var(--c-vib)} .stamp.s-up,.stamp.s-dn{color:var(--c-bend)} .stamp.s-cre,.stamp.s-dim{color:var(--c-vol)}
+.gscore .br2{fill:var(--c-br)} .gscore .s-vib{fill:var(--c-vib)} .gscore .s-up,.gscore .s-dn{fill:var(--c-bend)} .gscore .s-cre,.gscore .s-dim{fill:var(--c-vol)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted)}
+.legend span b{margin-right:4px}
+.marking .sl .x{font-size:26px;line-height:2.6;letter-spacing:.02em}
+.marking .sl .ch{display:inline-block;min-width:1.25em;text-align:center;padding:2px 3px;margin:0 2px;border-radius:8px;background:var(--roll);cursor:pointer}
+.marking .sl .ch:active{background:var(--amber-soft)}
+.marking .sl .ch.sp{background:none;min-width:.35em;padding:0;margin:0}
+.marking .sl .br{font-size:.8em}
 .chip{display:inline-flex;align-items:center;gap:6px;font-size:13px;background:var(--amber-soft);color:var(--ink);padding:4px 10px;border-radius:999px}
 .chip button{border:none;background:none;color:inherit;cursor:pointer;font-size:15px;padding:0 2px}
 .tabs{display:flex;border-bottom:1px solid var(--line);gap:4px}
@@ -324,6 +340,7 @@ input[type=file]{font:inherit;font-size:14px;max-width:100%}
       <button class="tool" data-s="cre" aria-pressed="false"><b>&lt;</b>점점 크게</button>
       <button class="tool" data-s="dim" aria-pressed="false"><b>&gt;</b>점점 작게</button>
     </div>
+    <div class="legend" id="symLegend"><span><b style="color:var(--c-br)">V</b>숨</span><span><b style="color:var(--c-vib)">〰</b>비브라토</span><span><b style="color:var(--c-bend)">↗↘</b>밴딩</span><span><b style="color:var(--c-vol)">&lt; &gt;</b>볼륨</span></div>
     <div class="tools" id="penBar" hidden>
       <button class="tool" data-c="amber" aria-pressed="true"><i class="dot d-amber"></i>노랑</button>
       <button class="tool" data-c="red" aria-pressed="false"><i class="dot d-red"></i>빨강</button>
@@ -839,8 +856,8 @@ function renderLine(el, i) {
   el.textContent = '';
   const set = new Set(ly.breaths[i] || []), mk = (ly.marks && ly.marks[i]) || {};
   Array.from(ly.lines[i]).forEach((ch, k) => {
-    const s = document.createElement('span'); s.className = 'ch'; s.dataset.k = k; s.textContent = ch;
-    if (mk[k] && SYMS[mk[k]]) { s.classList.add('mk'); s.dataset.m = SYMS[mk[k]].g; s.title = SYMS[mk[k]].n; }
+    const s = document.createElement('span'); s.className = ch.trim() ? 'ch' : 'ch sp'; s.dataset.k = k; s.textContent = ch;
+    if (mk[k] && SYMS[mk[k]]) { s.classList.add('mk'); s.dataset.m = SYMS[mk[k]].g; s.dataset.s = mk[k]; s.title = SYMS[mk[k]].n; }
     el.appendChild(s);
     if (set.has(k)) { const b = document.createElement('span'); b.className = 'br'; b.textContent = 'V'; b.title = '숨'; el.appendChild(b); }
   });
@@ -886,7 +903,7 @@ function setShMode(m) {
   $('sheet').classList.toggle('inking', m === 'pen');
   $('sheet').classList.toggle('finger', m === 'pen' && fingerDraw);
   $('shHint').textContent = m === 'view' ? '줄을 누르면 그 줄부터 들려줘요. 기호나 펜을 고르면 가사와 악보에 표시할 수 있어요.'
-    : m === 'sym' ? (shView === 'lyrics' ? '기호를 고르고 글자를 누르면 그 글자에 붙어요. 같은 기호를 한 번 더 누르면 지워져요.' : '기호를 고르고 악보 위를 누르면 그 자리에 찍혀요. 찍힌 기호를 누르면 지워져요.')
+    : m === 'sym' ? (shView === 'lyrics' ? '기호를 고르고 글자 칸을 누르세요. 숨(V)은 누른 글자 뒤에, 나머지는 글자 위에 붙어요. 같은 기호로 한 번 더 누르면 지워져요.' : '기호를 고르고 악보 위를 누르면 그 자리에 찍혀요. 찍힌 기호를 누르면 지워져요.')
     : '펜슬로 바로 쓰면 돼요. V, 물결(〰), 대각선(↗ ↘), <, > 를 한 번에 그리면 기호로 바뀌어요. 손가락으로는 화면이 넘어가고, 손가락으로도 쓰려면 "손가락 쓰기"를 켜세요.';
 }
 $('mView').onclick = () => setShMode('view');
@@ -1027,7 +1044,7 @@ function drawStamps(page, n) {
   const box = page.querySelector('.stamps'); box.textContent = '';
   const all = store.get('ibyeol-stamps-v1') || {};
   (all[n] || []).forEach((s, idx) => {
-    const el = document.createElement('button'); el.className = 'stamp'; el.textContent = SYMS[s.s] ? SYMS[s.s].g : '?'; el.title = SYMS[s.s] ? SYMS[s.s].n : '';
+    const el = document.createElement('button'); el.className = 'stamp s-' + s.s; el.textContent = SYMS[s.s] ? SYMS[s.s].g : '?'; el.title = SYMS[s.s] ? SYMS[s.s].n : '';
     el.style.left = (s.x * 100) + '%'; el.style.top = (s.y * 100) + '%';
     el.onclick = ev => { if (shMode !== 'sym') return; ev.stopPropagation(); const a = store.get('ibyeol-stamps-v1') || {}; (a[n] || []).splice(idx, 1); store.set('ibyeol-stamps-v1', a); drawStamps(page, n); };
     box.appendChild(el);
@@ -1304,7 +1321,7 @@ function renderGenScore() {
       const lsy = scoreLyr[sy] || (scoreLyr[sy] = { x: -99, alt: 0 }); lsy.alt = (x - lsy.x < 12) ? 1 - lsy.alt : 0; lsy.x = x;
       el('text', { x: x, y: bottom + 24 + lsy.alt * 11, class: 'lyr' }, sm.text);
       const br = new Set(ly.breaths[sm.line] || []), mk = (ly.marks && ly.marks[sm.line]) || {};
-      for (const kk of sm.ks) { if (mk[kk] && SYMS[mk[kk]]) el('text', { x: x, y: y0 - 14, class: 'mk mid' }, SYMS[mk[kk]].g); }
+      for (const kk of sm.ks) { if (mk[kk] && SYMS[mk[kk]]) el('text', { x: x, y: y0 - 14, class: 'mk mid s-' + mk[kk] }, SYMS[mk[kk]].g); }
       const lastK = sm.ks[sm.ks.length - 1];
       let nextSylK = Infinity; const lineIdx = Array.from(ly.lines[sm.line]).map((c, kk) => /[가-힣A-Za-z0-9]/.test(c) ? kk : -1).filter(kk => kk > lastK); if (lineIdx.length) nextSylK = lineIdx[0];
       for (const bk of br) if (bk >= lastK && bk < nextSylK) { sm.breathAfter = true; }
@@ -1433,7 +1450,7 @@ async function initCloud() {
 initCloud();
 
 /* ---------- new version check (hosted) ---------- */
-const BUILD = '1793175876';
+const BUILD = '1793176268';
 async function checkUpdate() {
   if (!HOSTED) return;
   try {
