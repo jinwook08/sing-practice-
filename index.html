@@ -277,8 +277,9 @@ input[type=file]{font:inherit;font-size:14px;max-width:100%}
       <button class="btn" id="openSheet2">가사창 열기 (숨표 찍기)</button>
     </div>
     <div class="xfer">
-      <p class="note"><b>다른 기기로 옮기기</b> · 가사, 시간, 숨표·기호, 필기는 이 기기에만 저장돼요. 아이폰에서 "복사"를 누르고 아이패드에서 "가져오기"를 누르면 그대로 옮겨져요. 같은 Apple ID면 복사한 내용이 자동으로 넘어가요.</p>
-      <div class="row"><button class="btn" id="exportAll">복사</button><button class="btn" id="importAll">가져오기</button></div>
+      <p class="note"><b>옮기기 · 백업</b> · 가사, 시간, 숨표·기호, 필기는 이 기기에만 저장돼요. 아이폰에서 "복사"를 누르고 아이패드에서 "가져오기"를 누르면 그대로 옮겨져요. 같은 Apple ID면 복사한 내용이 자동으로 넘어가요.</p>
+      <div class="row"><button class="btn" id="exportAll">복사</button><button class="btn" id="importAll">가져오기</button><button class="btn" id="saveBackup">백업 파일로 저장</button><label class="btn" for="loadBackup">백업 파일 열기</label></div>
+      <input type="file" id="loadBackup" class="vh" accept=".txt,.json,text/plain,application/json">
       <textarea id="xferBox" hidden placeholder="다른 기기에서 복사한 내용을 여기에 붙여넣고 &quot;가져오기&quot;를 다시 누르세요"></textarea>
       <p class="note" id="xferMsg" role="status"></p>
     </div>
@@ -1348,15 +1349,34 @@ $('importAll').onclick = async () => {
   else { try { txt = (await navigator.clipboard.readText()).trim(); } catch (e) {} }
   if (!txt.startsWith('IBYEOL1:')) { box.hidden = false; box.value = ''; box.focus(); xferMsg('복사한 내용을 아래 칸에 붙여넣고 "가져오기"를 다시 눌러 주세요.'); return; }
   try {
-    const d = JSON.parse(decodeURIComponent(escape(atob(txt.slice(8)))));
-    if (!d.ly || !Array.isArray(d.ly.lines)) throw new Error('bad');
-    ly = d.ly; if (!ly.breaths) ly.breaths = ly.lines.map(() => []); if (!ly.marks) ly.marks = ly.lines.map(() => ({}));
-    inkStore = d.ink || {}; saveInk(); store.set('ibyeol-stamps-v1', d.stamps || {});
-    $('lyText').value = ly.lines.join('\n'); saveLy();
+    applyBackup(txt);
     box.hidden = true; box.value = '';
     xferMsg('가져왔어요. 가사 ' + ly.lines.length + '줄과 숨표·기호·필기가 들어왔어요.');
   } catch (e) { xferMsg('내용을 읽지 못했어요. 다른 기기에서 "복사"를 다시 눌러 주세요.'); }
 };
+
+function backupText() { return 'IBYEOL1:' + btoa(unescape(encodeURIComponent(JSON.stringify({ v: 1, ly, ink: inkStore, stamps: store.get('ibyeol-stamps-v1') || {} })))); }
+function applyBackup(txt) {
+  const d = JSON.parse(decodeURIComponent(escape(atob(txt.trim().slice(8)))));
+  if (!d.ly || !Array.isArray(d.ly.lines)) throw new Error('bad');
+  ly = d.ly; if (!ly.breaths) ly.breaths = ly.lines.map(() => []); if (!ly.marks) ly.marks = ly.lines.map(() => ({}));
+  inkStore = d.ink || {}; saveInk(); store.set('ibyeol-stamps-v1', d.stamps || {});
+  $('lyText').value = ly.lines.join('\n'); saveLy();
+}
+$('saveBackup').onclick = () => {
+  if (!ly.lines.length) { xferMsg('저장할 가사가 아직 없어요.'); return; }
+  const blob = new Blob([backupText()], { type: 'text/plain' }), a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); const d = new Date(); a.download = '이별택시_연습실_백업_' + (d.getMonth() + 1) + '월' + d.getDate() + '일.txt';
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  xferMsg('백업 파일을 저장했어요. 파일 앱의 "다운로드"에 있어요. 기기를 바꾸거나 기록이 지워져도 이 파일로 되살릴 수 있어요.');
+};
+$('loadBackup').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { const txt = await f.text(); if (!txt.trim().startsWith('IBYEOL1:')) throw 0; applyBackup(txt); xferMsg('백업에서 가사 ' + ly.lines.length + '줄과 숨표·기호·필기를 되살렸어요.'); }
+  catch (er) { xferMsg('이 파일은 연습실 백업 파일이 아니에요.'); }
+  e.target.value = '';
+};
+try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
 
 /* ---------- tabs ---------- */
 function showTab(name) {
