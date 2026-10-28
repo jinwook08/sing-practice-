@@ -1429,8 +1429,25 @@ async function initCloud() {
 }
 initCloud();
 
+/* ---------- new version check (hosted) ---------- */
+const BUILD = '1793175662';
+async function checkUpdate() {
+  if (!HOSTED) return;
+  try {
+    const base = location.href.split('?')[0].split('#')[0];
+    const txt = await (await fetch(base + '?check=' + Date.now(), { cache: 'no-store' })).text();
+    const m = txt.match(/const BUILD = '([^']+)'/);
+    if (m && m[1] !== BUILD) {
+      try { if (sessionStorage.getItem('ibyeol-upd') === m[1]) return; sessionStorage.setItem('ibyeol-upd', m[1]); } catch (e) {}
+      location.replace(base + '?v=' + m[1]);
+    }
+  } catch (e) {}
+}
+checkUpdate();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(); });
+
 /* ---------- reload ---------- */
-function doReload() { if (cloud) { try { clearTimeout(cloudT); cloudFlush(); } catch (e) {} } setTimeout(() => location.reload(), cloud ? 600 : 0); }
+function doReload() { if (cloud) { try { clearTimeout(cloudT); cloudFlush(); } catch (e) {} } setTimeout(() => { if (HOSTED) location.replace(location.href.split('?')[0].split('#')[0] + '?v=' + Date.now()); else location.reload(); }, cloud ? 600 : 0); }
 $('reloadBtn').onclick = doReload; $('shReload').onclick = doReload;
 
 /* ---------- tabs ---------- */
