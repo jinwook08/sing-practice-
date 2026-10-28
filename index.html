@@ -94,7 +94,11 @@ canvas.ink{position:absolute;left:0;top:0;pointer-events:none;touch-action:pan-y
 .marking .stamp{pointer-events:auto;cursor:pointer}
 .marking .page{cursor:crosshair}
 .pagebar{justify-content:space-between;margin:12px 0 6px}
+.tundo{margin-left:12px;border:none;background:none;color:var(--amber-soft);font:inherit;font-weight:700;text-decoration:underline;cursor:pointer;padding:0}
 .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;z-index:60;font-size:15px;white-space:nowrap}
+.sl .xw{flex:1;min-width:0;display:flex;flex-direction:column}
+canvas.mel{display:block;width:100%;height:50px}
+#melTgl[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .chip{display:inline-flex;align-items:center;gap:6px;font-size:13px;background:var(--amber-soft);color:var(--ink);padding:4px 10px;border-radius:999px}
 .chip button{border:none;background:none;color:inherit;cursor:pointer;font-size:15px;padding:0 2px}
 .tabs{display:flex;border-bottom:1px solid var(--line);gap:4px}
@@ -276,6 +280,8 @@ input[type=file]{font:inherit;font-size:14px;max-width:100%}
       <button class="btn" id="shPrev" aria-label="이전 줄">◀</button>
       <button class="btn primary" id="shLoop">이 줄 반복</button>
       <button class="btn" id="shNext" aria-label="다음 줄">▶</button>
+      <button class="btn" id="melTgl" aria-pressed="true">멜로디</button>
+      <button class="btn" id="autoBr">숨표 자동</button>
     </div>
     <div class="row">
       <div class="seg" role="group" aria-label="도구"><button id="mView" aria-pressed="true">보기</button><button id="mSym" aria-pressed="false">기호</button><button id="mPen" aria-pressed="false">펜</button></div>
@@ -318,7 +324,7 @@ const P = Float32Array.from(REF.p, v => v / 10);
 const NOTES = REF.notes, PHR = REF.phrases;
 const LO = 40, HI = 72;
 const NN = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-const SOL = ['도','도#','레','레#','미','파','파#','솔','솔#','라','라#','시'];
+const SOL = ['도','도#','레','미♭','미','파','파#','솔','솔#','라','시♭','시'];
 const $ = id => document.getElementById(id);
 const fmt = t => { t = Math.max(0, t); const m = Math.floor(t / 60), s = Math.floor(t % 60); return m + ':' + String(s).padStart(2, '0'); };
 const fmt1 = t => { t = Math.max(0, t); const m = Math.floor(t / 60), s = (t % 60).toFixed(1); return m + ':' + s.padStart(4, '0'); };
@@ -853,6 +859,7 @@ function updPenBar() {
 }
 $('undoBtn').onclick = () => {
   const u = undoStack.pop(); if (!u) return;
+  if (u.type === 'breathsAll') { ly.breaths = u.prev; saveLy(); return; }
   if (u.type === 'stamp') { const a = store.get('ibyeol-stamps-v1') || {}; (a[u.n] || []).pop(); store.set('ibyeol-stamps-v1', a); const pg = document.querySelectorAll('#scorePages .page')[u.n]; if (pg) drawStamps(pg, u.n); return; }
   if (u.type === 'br') { const arr = ly.breaths[u.i] || []; const at = arr.indexOf(u.k); if (at >= 0) arr.splice(at, 1); saveLy(); return; }
   if (u.type === 'mark') { const m = ly.marks[u.i] || (ly.marks[u.i] = {}); if (u.prev) m[u.k] = u.prev; else delete m[u.k]; saveLy(); return; }
@@ -1006,11 +1013,14 @@ function renderSheet() {
   ly.lines.forEach((l, i) => {
     const r = document.createElement('div'); r.className = 'sl'; r.dataset.i = i;
     const tt = document.createElement('span'); tt.className = 't'; tt.textContent = fmt(ly.times[i] || 0);
-    const x = document.createElement('div'); x.className = 'x'; renderLine(x, i);
-    r.append(tt, x); B.appendChild(r);
+    const xw = document.createElement('div'); xw.className = 'xw';
+    const x = document.createElement('div'); x.className = 'x'; renderLine(x, i); xw.appendChild(x);
+    if (showMel) { const m3 = document.createElement('canvas'); m3.className = 'mel'; m3.setAttribute('aria-hidden', 'true'); xw.appendChild(m3); }
+    r.append(tt, xw); B.appendChild(r);
     attachInk(r, inkKey(i), false);
   });
   B.scrollTop = y;
+  requestAnimationFrame(() => document.querySelectorAll('.sl canvas.mel').forEach(c3 => drawMel(c3, +c3.closest('.sl').dataset.i)));
   sheetLine = -2; markSheet(lyIndex(cur())); updLoopUI();
 }
 $('shBody').onclick = e => {
@@ -1109,13 +1119,72 @@ function tryGesture(cv2, st) {
     else { const m = ly.marks[i] || (ly.marks[i] = {}); undoStack.push({ type: 'mark', i, k: best.k, prev: m[best.k] }); m[best.k] = g.s; }
     saveLy();
   }
-  shToast(SYMS[g.s].g + ' ' + SYMS[g.s].n + ' 기호로 바꿨어요 · 아니면 되돌리기');
+  shToast(SYMS[g.s].g + ' ' + SYMS[g.s].n + ' 기호로 바꿨어요', true);
   return true;
 }
 let toastT = 0;
-function shToast(msg) { const el = $('shToast'); el.textContent = msg; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 1600); }
+function shToast(msg, undo) { const el = $('shToast'); el.textContent = msg; if (undo) { const b = document.createElement('button'); b.className = 'tundo'; b.textContent = '되돌리기'; b.onclick = () => { $('undoBtn').click(); el.hidden = true; }; el.appendChild(b); } el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, undo ? 4000 : 1600); }
 $('autoSym').onclick = () => { autoSym = !autoSym; try { localStorage.setItem('ibyeol-autosym', autoSym ? '1' : '0'); } catch (e) {} $('autoSym').setAttribute('aria-pressed', String(autoSym)); };
 $('autoSym').setAttribute('aria-pressed', String(autoSym));
+/* ---- melody strip under each lyric line + auto breaths ---- */
+let NOTE_MASK = null;
+function noteMask() { if (NOTE_MASK) return NOTE_MASK; const M = new Uint8Array(NB); for (const n of NOTES) for (let i = Math.floor(n[0] / HOP); i <= Math.floor(n[1] / HOP) && i < NB; i++) M[i] = 1; return (NOTE_MASK = M); }
+let showMel = true; try { showMel = localStorage.getItem('ibyeol-mel') !== '0'; } catch (e) {}
+function lineRange(i) { const s = ly.times[i] || 0, e = i + 1 < ly.times.length ? ly.times[i + 1] : lineEnd(i) + 0.5; return [s - 0.2, e]; }
+function drawMel(cv3, i, t) {
+  const r = cv3.getBoundingClientRect(), d = devicePixelRatio || 1;
+  if (!r.width) return;
+  if (cv3.width !== Math.round(r.width * d)) { cv3.width = Math.round(r.width * d); cv3.height = Math.round(r.height * d); }
+  const g3 = cv3.getContext('2d'); g3.setTransform(d, 0, 0, d, 0, 0); g3.clearRect(0, 0, r.width, r.height);
+  const [s, e] = lineRange(i), ns = NOTES.filter(n => n[1] > s && n[0] < e && n[1] - n[0] >= 0.12);
+  if (!ns.length) return;
+  let lo = Math.min(...ns.map(n => n[2])), hi = Math.max(...ns.map(n => n[2]));
+  if (hi - lo < 5) { const m = (hi + lo) / 2; lo = Math.floor(m - 2.5); hi = Math.ceil(m + 2.5); }
+  const top = 14, H3 = r.height - top - 2, X = x => (x - s) / (e - s) * r.width, Y = m => top + (hi - m) / (hi - lo) * (H3 - 6);
+  g3.font = '10px ' + col.mono; g3.textBaseline = 'bottom'; g3.textAlign = 'left';
+  let lastLabelX = -99;
+  for (const n of ns) {
+    const x = Math.max(0, X(n[0])), w = Math.max(2, X(n[1]) - x - 1), y = Y(n[2]);
+    const on = t != null && t >= n[0] && t < n[1];
+    g3.fillStyle = on ? col.now : col.note; g3.beginPath(); g3.roundRect ? g3.roundRect(x, y, w, 6, 3) : g3.rect(x, y, w, 6); g3.fill();
+    if (x - lastLabelX > 16) { g3.fillStyle = on ? col.ink : col.muted; g3.fillText(SOL[((n[2] % 12) + 12) % 12], x, y - 1); lastLabelX = x; }
+  }
+  if (t != null && t >= s && t < e) { g3.fillStyle = col.ink; g3.globalAlpha = .6; g3.fillRect(X(t) - 1, 0, 2, r.height); g3.globalAlpha = 1; }
+}
+function updMelNow(t) {
+  if ($('sheet').hidden || !showMel || shView !== 'lyrics') return;
+  const k = lyIndex(t); if (k < 0) return;
+  const cv3 = document.querySelector('.sl[data-i="' + k + '"] canvas.mel'); if (cv3) drawMel(cv3, k, t);
+  if (updMelNow.last != null && updMelNow.last !== k) { const p = document.querySelector('.sl[data-i="' + updMelNow.last + '"] canvas.mel'); if (p) drawMel(p, updMelNow.last); }
+  updMelNow.last = k;
+}
+$('melTgl').onclick = () => { showMel = !showMel; try { localStorage.setItem('ibyeol-mel', showMel ? '1' : '0'); } catch (e) {} $('melTgl').setAttribute('aria-pressed', String(showMel)); renderSheet(); };
+$('melTgl').setAttribute('aria-pressed', String(showMel));
+const BR_GAP = 0.5;
+function autoBreaths() {
+  const M = noteMask(); let added = 0;
+  const prev = ly.breaths.map(a => (a || []).slice());
+  ly.lines.forEach((l, i) => {
+    const idx = Array.from(l).map((ch, k) => /[가-힣A-Za-z0-9]/.test(ch) ? k : -1).filter(k => k >= 0), c = idx.length; if (!c) return;
+    const s = ly.times[i], e = i + 1 < ly.times.length ? ly.times[i + 1] : lineEnd(i) + 1;
+    const a = Math.max(0, Math.floor(s / HOP)), b = Math.min(NB, Math.floor(e / HOP));
+    let tot = 0; for (let j = a; j < b; j++) tot += M[j]; if (!tot) return;
+    const arr = ly.breaths[i] || (ly.breaths[i] = []);
+    let v = 0, gap = 0, seen = false, lastSb = 0;
+    for (let j = a; j < b; j++) {
+      if (M[j]) {
+        if (seen && gap * HOP >= BR_GAP) { const sb = Math.round(c * v / tot); if (sb > 1 && sb < c - 1 && sb - lastSb >= 3) { const k = idx[sb - 1]; if (!arr.includes(k)) { arr.push(k); added++; } lastSb = sb; } }
+        v++; gap = 0; seen = true;
+      } else if (seen) gap++;
+    }
+    if (gap * HOP >= 0.3 || i === ly.lines.length - 1) { const k = idx[c - 1]; if (!arr.includes(k)) { arr.push(k); added++; } }
+    arr.sort((x, y) => x - y);
+  });
+  undoStack.push({ type: 'breathsAll', prev });
+  saveLy();
+  shToast(added ? '숨표 ' + added + '개를 찍었어요' : '새로 찍을 숨표가 없어요', added > 0);
+}
+$('autoBr').onclick = () => { if (!ly.lines.length) { shToast('먼저 가사를 넣어 주세요'); return; } autoBreaths(); };
 let sheetLine = -2, lastTouch = 0;
 $('shBody').addEventListener('touchstart', () => lastTouch = Date.now(), { passive: true });
 $('shBody').addEventListener('wheel', () => lastTouch = Date.now(), { passive: true });
@@ -1206,6 +1275,7 @@ function frame(now) {
   if (me > 0 && r > 0) { let df = me - r; if ($('fold').checked) df = fold(df); const c = Math.round(df * 100); st.textContent = Math.abs(c) <= 50 ? '맞아요 ' + (c > 0 ? '+' : '') + c + '¢' : (c > 0 ? '높아요 +' : '낮아요 ') + c + '¢'; st.className = Math.abs(c) <= 50 ? 'ok' : 'bad'; }
   else { st.textContent = ''; st.className = ''; }
   if (now - lastSeekUpd > 200) { lastSeekUpd = now; $('seek').value = t.toFixed(1); $('timeTxt').textContent = fmt(t) + ' / 5:27'; if (!$('sheet').hidden) $('shTime').textContent = fmt(t); }
+  updMelNow(t);
   requestAnimationFrame(frame);
 }
 try { const tb = sessionStorage.getItem('ibyeol-tab'); if (tb) showTab(tb); } catch (e) {}
