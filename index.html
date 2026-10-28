@@ -164,7 +164,7 @@ input[type=file]{font:inherit;font-size:14px;max-width:100%}
       <h1>이별택시 연습실</h1>
       <div class="sub">선생님이 만들어 주신 반주 · 원곡 보컬에서 뽑은 기준 멜로디</div>
     </div>
-    <div class="roof">KEY −2</div>
+    <div class="row"><button class="btn" id="reloadBtn" aria-label="새로고침">↻ 새로고침</button><div class="roof">KEY −2</div></div>
   </header>
 
   <section class="stage" aria-label="음정 보기">
@@ -183,7 +183,7 @@ input[type=file]{font:inherit;font-size:14px;max-width:100%}
     <p class="note" style="user-select:all">https://jinwook08.github.io/sing-practice-/</p>
   </section>
   <section class="setup" id="setup" hidden>
-    <p><b>처음 한 번만:</b> 폰에 있는 반주 파일을 골라 주세요. 고른 파일은 이 폰에만 저장돼서 다음부터는 바로 열려요.</p>
+    <p><b>처음 한 번만:</b> 폰에 있는 반주 파일을 골라 주세요. MP3 파일이 가장 잘 돼요. 고른 파일은 이 폰에만 저장돼서 다음부터는 바로 열려요.</p>
     <div class="row">
       <label class="btn primary" for="pickMr">MR 파일 고르기</label>
       <label class="btn" for="pickAr">원곡 파일 고르기 (선택)</label>
@@ -301,6 +301,7 @@ input[type=file]{font:inherit;font-size:14px;max-width:100%}
       <h2>가사창</h2>
       <label class="btn primary" for="pickMr" id="shPick" hidden>MR 파일 고르기</label>
       <span class="time" id="shTime">0:00</span>
+      <button class="btn" id="shReload" aria-label="새로고침">↻</button>
       <button class="btn" id="shClose">닫기</button>
     </div>
     <div class="row">
@@ -404,7 +405,7 @@ function setPlaying(on) {
   if (on) {
     place(a, src, viewT);
     $('loadTxt').textContent = '반주 불러오는 중…';
-    const pr = a.play(); if (pr) pr.catch(() => { playing = false; updBtn(); if (!$('sheet').hidden) shToast('소리를 재생하지 못했어요. ▶를 한 번 더 눌러 주세요'); $('loadTxt').textContent = '재생이 안 됐어요. ▶를 한 번 더 눌러 보세요.'; if (a._file && !a._blob) { a._blob = true; fetch(a._file).then(r => r.blob()).then(b => { a.src = URL.createObjectURL(b); }).catch(() => {}); } });
+    const pr = a.play(); if (pr) pr.catch(err => { playing = false; updBtn(); if (a.error) { audioFail(src); return; } if (!$('sheet').hidden) shToast('소리를 재생하지 못했어요. ▶를 한 번 더 눌러 주세요'); $('loadTxt').textContent = '재생이 안 됐어요. ▶를 한 번 더 눌러 보세요.'; if (a._file && !a._blob) { a._blob = true; fetch(a._file).then(r => r.blob()).then(b => { a.src = URL.createObjectURL(b); }).catch(() => {}); } });
     playing = true; wake();
   } else { if (playing) viewT = cur(); a.pause(); playing = false; }
   updBtn();
@@ -450,8 +451,14 @@ $('loopOff').onclick = clearLoop;
 function idb() { return new Promise((res, rej) => { const r = indexedDB.open('ibyeol', 1); r.onupgradeneeded = () => r.result.createObjectStore('audio'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
 async function idbGet(k) { try { const db = await idb(); return await new Promise(res => { const q = db.transaction('audio').objectStore('audio').get(k); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); }); } catch (e) { return null; } }
 async function idbPut(k, v) { try { const db = await idb(); await new Promise(res => { const tx = db.transaction('audio', 'readwrite'); tx.objectStore('audio').put(v, k); tx.oncomplete = res; tx.onerror = res; }); } catch (e) {} }
+function audioFail(k) {
+  const msg = (k === 'mr' ? 'MR' : '원곡') + ' 파일을 재생하지 못했어요. 보내 드린 MP3 파일로 다시 골라 주세요.';
+  $('loadTxt').textContent = msg; if (!$('sheet').hidden) shToast(msg);
+  if (HOSTED) { audios[k]._has = false; $('setup').dataset.open = '1'; $('setup').hidden = false; $('setupTxt').textContent = msg; if ($('shPick')) $('shPick').hidden = false; }
+}
 function usePicked(k, blob) {
-  const a = audios[k]; if (a._url) URL.revokeObjectURL(a._url);
+  const a = audios[k];
+  if (!a._errHook) { a._errHook = true; a.addEventListener('error', () => { if (a.src) audioFail(k); }); } if (a._url) URL.revokeObjectURL(a._url);
   a._url = URL.createObjectURL(blob); a.src = a._url; a._has = true;
   a.addEventListener('loadedmetadata', () => { if (Math.abs(a.duration - DUR) > 4) $('setupTxt').textContent = '고른 ' + (k === 'mr' ? 'MR' : '원곡') + ' 길이가 ' + fmt(a.duration) + '예요. 이별택시(5:27) 파일이 맞는지 확인해 주세요.'; }, { once: true });
   updSetup();
@@ -465,9 +472,9 @@ function updSetup() {
   if ($('shPick')) $('shPick').hidden = m;
   $('loadTxt').textContent = m ? '▶를 누르면 반주가 나와요' : '먼저 반주 파일을 골라 주세요';
 }
-for (const k of ['mr', 'ar']) $(k === 'mr' ? 'pickMr' : 'pickAr').onchange = async e => { const f = e.target.files[0]; if (!f) return; if (playing) setPlaying(false); usePicked(k, f); await idbPut(k, f); };
+for (const k of ['mr', 'ar']) $(k === 'mr' ? 'pickMr' : 'pickAr').onchange = async e => { const f = e.target.files[0]; if (!f) return; if (playing) setPlaying(false); let buf = null; try { buf = await f.arrayBuffer(); } catch (er) {} const blob = buf ? new Blob([buf], { type: f.type || 'audio/mpeg' }) : f; usePicked(k, blob); if (buf) await idbPut(k, { buf, type: f.type || 'audio/mpeg', name: f.name }); else await idbPut(k, f); };
 $('changeFiles').onclick = () => { $('setup').dataset.open = '1'; $('setup').hidden = false; $('setup').scrollIntoView({ behavior: 'smooth', block: 'center' }); };
-if (HOSTED) { updSetup(); (async () => { for (const k of ['mr', 'ar']) { const b = await idbGet(k); if (b) usePicked(k, b); } updSetup(); })(); }
+if (HOSTED) { updSetup(); (async () => { for (const k of ['mr', 'ar']) { const b = await idbGet(k); if (!b) continue; if (b.buf) usePicked(k, new Blob([b.buf], { type: b.type || 'audio/mpeg' })); else usePicked(k, b); } updSetup(); })(); }
 
 /* ---------- pitch ---------- */
 function yin(x, sr, fmin, fmax, th) {
@@ -1421,6 +1428,10 @@ async function initCloud() {
   else syncNote('가사를 넣으면 계정에 자동으로 저장돼요. 앱을 지우거나 기기를 바꿔도 남아요.');
 }
 initCloud();
+
+/* ---------- reload ---------- */
+function doReload() { if (cloud) { try { clearTimeout(cloudT); cloudFlush(); } catch (e) {} } setTimeout(() => location.reload(), cloud ? 600 : 0); }
+$('reloadBtn').onclick = doReload; $('shReload').onclick = doReload;
 
 /* ---------- tabs ---------- */
 function showTab(name) {
