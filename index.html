@@ -116,6 +116,8 @@ canvas.mel{display:block;width:100%;height:50px}
 .gscore .mk,.gscore .br2{font-size:11px;fill:var(--amber);font-weight:700}
 .gscore .ph{stroke:var(--off);stroke-width:1.2}
 .gpage{padding:6px 0}
+.xfer{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px;margin-top:4px}
+#xferBox{min-height:90px}
 .chip{display:inline-flex;align-items:center;gap:6px;font-size:13px;background:var(--amber-soft);color:var(--ink);padding:4px 10px;border-radius:999px}
 .chip button{border:none;background:none;color:inherit;cursor:pointer;font-size:15px;padding:0 2px}
 .tabs{display:flex;border-bottom:1px solid var(--line);gap:4px}
@@ -273,6 +275,12 @@ input[type=file]{font:inherit;font-size:14px;max-width:100%}
       <button class="btn" id="tapStart">탭으로 직접 맞추기</button>
       <button class="btn" id="lyClear">가사 지우기</button>
       <button class="btn" id="openSheet2">가사창 열기 (숨표 찍기)</button>
+    </div>
+    <div class="xfer">
+      <p class="note"><b>다른 기기로 옮기기</b> · 가사, 시간, 숨표·기호, 필기는 이 기기에만 저장돼요. 아이폰에서 "복사"를 누르고 아이패드에서 "가져오기"를 누르면 그대로 옮겨져요. 같은 Apple ID면 복사한 내용이 자동으로 넘어가요.</p>
+      <div class="row"><button class="btn" id="exportAll">복사</button><button class="btn" id="importAll">가져오기</button></div>
+      <textarea id="xferBox" hidden placeholder="다른 기기에서 복사한 내용을 여기에 붙여넣고 &quot;가져오기&quot;를 다시 누르세요"></textarea>
+      <p class="note" id="xferMsg" role="status"></p>
     </div>
     <div id="tapBox" class="panel" hidden>
       <p class="note">반주가 처음부터 나와요. 각 줄을 부르기 시작하는 순간에 아래 버튼을 누르세요.</p>
@@ -1324,6 +1332,31 @@ function markSheet(k) {
   if (el && shMode === 'view' && Date.now() - lastTouch > 3000) { const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; el.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' }); }
 }
 $('lineBar').hidden = !ly.lines.length;
+
+/* ---------- move data between devices ---------- */
+function xferMsg(s) { $('xferMsg').textContent = s; }
+$('exportAll').onclick = async () => {
+  if (!ly.lines.length) { xferMsg('옮길 가사가 아직 없어요.'); return; }
+  const data = JSON.stringify({ v: 1, ly, ink: inkStore, stamps: store.get('ibyeol-stamps-v1') || {} });
+  const txt = 'IBYEOL1:' + btoa(unescape(encodeURIComponent(data)));
+  try { await navigator.clipboard.writeText(txt); xferMsg('복사했어요. 다른 기기에서 이 화면을 열고 "가져오기"를 누르세요.'); $('xferBox').hidden = true; }
+  catch (e) { const b = $('xferBox'); b.hidden = false; b.value = txt; b.focus(); b.select(); xferMsg('자동 복사가 안 돼서 아래 칸에 넣었어요. 전체 선택해서 복사해 주세요.'); }
+};
+$('importAll').onclick = async () => {
+  const box = $('xferBox'); let txt = '';
+  if (!box.hidden && box.value.trim().startsWith('IBYEOL1:')) txt = box.value.trim();
+  else { try { txt = (await navigator.clipboard.readText()).trim(); } catch (e) {} }
+  if (!txt.startsWith('IBYEOL1:')) { box.hidden = false; box.value = ''; box.focus(); xferMsg('복사한 내용을 아래 칸에 붙여넣고 "가져오기"를 다시 눌러 주세요.'); return; }
+  try {
+    const d = JSON.parse(decodeURIComponent(escape(atob(txt.slice(8)))));
+    if (!d.ly || !Array.isArray(d.ly.lines)) throw new Error('bad');
+    ly = d.ly; if (!ly.breaths) ly.breaths = ly.lines.map(() => []); if (!ly.marks) ly.marks = ly.lines.map(() => ({}));
+    inkStore = d.ink || {}; saveInk(); store.set('ibyeol-stamps-v1', d.stamps || {});
+    $('lyText').value = ly.lines.join('\n'); saveLy();
+    box.hidden = true; box.value = '';
+    xferMsg('가져왔어요. 가사 ' + ly.lines.length + '줄과 숨표·기호·필기가 들어왔어요.');
+  } catch (e) { xferMsg('내용을 읽지 못했어요. 다른 기기에서 "복사"를 다시 눌러 주세요.'); }
+};
 
 /* ---------- tabs ---------- */
 function showTab(name) {
