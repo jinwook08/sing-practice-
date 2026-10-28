@@ -99,6 +99,23 @@ canvas.ink{position:absolute;left:0;top:0;pointer-events:none;touch-action:pan-y
 .sl .xw{flex:1;min-width:0;display:flex;flex-direction:column}
 canvas.mel{display:block;width:100%;height:50px}
 #melTgl[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.sh3{font-size:16px;margin:16px 0 4px}
+.gscore{display:block;width:100%;height:auto}
+.gscore .st{stroke:var(--muted);stroke-width:.6}
+.gscore .bl{stroke:var(--muted);stroke-width:.8}
+.gscore .nh{fill:var(--ink)} .gscore .nh.on{fill:var(--off)}
+.gscore .dur{fill:var(--note)} .gscore .dur.tie{opacity:.6}
+.gscore text{font-family:var(--f-body)}
+.gscore .lyr{font-size:9.5px;fill:var(--ink);text-anchor:middle}
+.gscore .clef{font-size:34px;fill:var(--ink);font-family:"Apple Symbols","Noto Music","Segoe UI Symbol","Bravura",serif}
+.gscore .oct{font-size:7px;fill:var(--ink)}
+.gscore .acc{font-size:10px;fill:var(--ink)} .gscore .acc.sm{font-size:9px}
+.gscore .bn{font-size:7px;fill:var(--muted);font-family:var(--f-mono)}
+.gscore .mid{text-anchor:middle}
+.gscore .mrest{fill:var(--ink)}
+.gscore .mk,.gscore .br2{font-size:11px;fill:var(--amber);font-weight:700}
+.gscore .ph{stroke:var(--off);stroke-width:1.2}
+.gpage{padding:6px 0}
 .chip{display:inline-flex;align-items:center;gap:6px;font-size:13px;background:var(--amber-soft);color:var(--ink);padding:4px 10px;border-radius:999px}
 .chip button{border:none;background:none;color:inherit;cursor:pointer;font-size:15px;padding:0 2px}
 .tabs{display:flex;border-bottom:1px solid var(--line);gap:4px}
@@ -310,6 +327,10 @@ input[type=file]{font:inherit;font-size:14px;max-width:100%}
   <div class="toast" id="shToast" hidden role="status"></div>
   <div class="sheet-body" id="shBody"></div>
   <div class="sheet-body" id="scoreBody" hidden>
+    <h3 class="sh3">자동 악보</h3>
+    <p class="note">원곡 보컬에서 뽑은 멜로디를 다장조(C), 4/4박자(♩=63)에 맞춰 그린 연습용 악보예요. 남성 보컬이라 실제 소리는 적힌 음보다 한 옥타브 낮아요(높은음자리표 아래 8). 넣어 둔 가사가 음표 아래에, 가사창에서 찍은 기호가 음표 위에 같이 나와요. 꾸밈음이나 박자는 실제와 조금 다를 수 있어요.</p>
+    <div id="genScore"></div>
+    <h3 class="sh3">내 악보 사진</h3>
     <div class="row"><label class="btn primary" for="addScore">악보 사진 추가</label></div>
     <input type="file" id="addScore" class="vh" accept="image/*" multiple>
     <p class="note" id="scoreEmpty">악보를 사진이나 스크린샷으로 올리면 그 위에 펜으로 쓰고 기호를 찍을 수 있어요. PDF는 화면을 캡처해서 올려 주세요. 사진은 이 기기에만 저장돼요.</p>
@@ -721,7 +742,8 @@ function smartTimes(lines) {
   const st = [bb]; for (let i = L - 2; i >= 0; i--) st.push(back[i][st[st.length - 1]]); st.reverse();
   return st.map(k => +(T[k] - 0.05).toFixed(2));
 }
-function saveLy() { store.set('ibyeol-lyrics-v1', ly); renderLyList(); renderSheet(); lastLy = -2; $('lineBar').hidden = !ly.lines.length; }
+function saveLy() {
+  if (typeof renderGenScore === 'function' && !$('sheet').hidden && shView === 'score') setTimeout(renderGenScore, 0); store.set('ibyeol-lyrics-v1', ly); renderLyList(); renderSheet(); lastLy = -2; $('lineBar').hidden = !ly.lines.length; }
 function keepMarks(lines) { const old = {}; ly.lines.forEach((l, i) => { if (!(l in old)) old[l] = (ly.marks && ly.marks[i]) || {}; }); return lines.map(l => Object.assign({}, old[l] || {})); }
 function keepBreaths(lines) { const old = {}; ly.lines.forEach((l, i) => { if (!(l in old)) old[l] = ly.breaths[i] || []; }); return lines.map(l => (old[l] || []).slice()); }
 function lyIndex(t) { let k = -1; for (let i = 0; i < ly.times.length; i++) if (ly.times[i] <= t + 0.05) k = i; return k; }
@@ -860,7 +882,7 @@ function updPenBar() {
 $('undoBtn').onclick = () => {
   const u = undoStack.pop(); if (!u) return;
   if (u.type === 'breathsAll') { ly.breaths = u.prev; saveLy(); return; }
-  if (u.type === 'stamp') { const a = store.get('ibyeol-stamps-v1') || {}; (a[u.n] || []).pop(); store.set('ibyeol-stamps-v1', a); const pg = document.querySelectorAll('#scorePages .page')[u.n]; if (pg) drawStamps(pg, u.n); return; }
+  if (u.type === 'stamp') { const a = store.get('ibyeol-stamps-v1') || {}; (a[u.n] || []).pop(); store.set('ibyeol-stamps-v1', a); const pg = document.querySelector('#scoreBody .page[data-n="' + u.n + '"]'); if (pg) drawStamps(pg, u.n); return; }
   if (u.type === 'br') { const arr = ly.breaths[u.i] || []; const at = arr.indexOf(u.k); if (at >= 0) arr.splice(at, 1); saveLy(); return; }
   if (u.type === 'mark') { const m = ly.marks[u.i] || (ly.marks[u.i] = {}); if (u.prev) m[u.k] = u.prev; else delete m[u.k]; saveLy(); return; }
   const arr = inkStore[u.key] || (inkStore[u.key] = []);
@@ -947,11 +969,12 @@ $('clearInk').onclick = () => {
 /* score pages (photos of sheet music) kept on this device */
 async function loadScore() { const b = await idbGet('score'); scoreBlobs = Array.isArray(b) ? b : []; }
 function renderScore() {
+  renderGenScore();
   const B = $('scorePages'); B.textContent = '';
   scoreUrls.forEach(u => URL.revokeObjectURL(u)); scoreUrls = [];
   $('scoreEmpty').hidden = scoreBlobs.length > 0;
   scoreBlobs.forEach((blob, n) => {
-    const page = document.createElement('div'); page.className = 'page';
+    const page = document.createElement('div'); page.className = 'page'; page.dataset.n = n;
     const img = document.createElement('img'); const u = URL.createObjectURL(blob); scoreUrls.push(u); img.src = u; img.alt = '악보 ' + (n + 1) + '쪽';
     page.appendChild(img);
     const stamps = document.createElement('div'); stamps.className = 'stamps'; page.appendChild(stamps);
@@ -971,7 +994,7 @@ function shiftScoreKeys(n) {
   for (const [k, v] of Object.entries(inkStore)) { const m = k.match(/^S:(\d+)$/); if (!m) { out[k] = v; continue; } const j = +m[1]; if (j < n) out[k] = v; else if (j > n) out['S:' + (j - 1)] = v; }
   inkStore = out; saveInk();
   const st = store.get('ibyeol-stamps-v1') || {}, o2 = {};
-  for (const [k, v] of Object.entries(st)) { const j = +k; if (j < n) o2[j] = v; else if (j > n) o2[j - 1] = v; }
+  for (const [k, v] of Object.entries(st)) { const j = +k; if (isNaN(j)) o2[k] = v; else if (j < n) o2[j] = v; else if (j > n) o2[j - 1] = v; }
   store.set('ibyeol-stamps-v1', o2);
 }
 $('addScore').onchange = async e => {
@@ -988,10 +1011,10 @@ function drawStamps(page, n) {
     box.appendChild(el);
   });
 }
-$('scorePages').addEventListener('click', e => {
+$('scoreBody').addEventListener('click', e => {
   if (shMode !== 'sym') return;
   const page = e.target.closest('.page'); if (!page || e.target.closest('.stamp')) return;
-  const n = [...document.querySelectorAll('#scorePages .page')].indexOf(page), r = page.getBoundingClientRect();
+  const n = page.dataset.n, r = page.getBoundingClientRect();
   const a = store.get('ibyeol-stamps-v1') || {}; (a[n] || (a[n] = [])).push({ s: curSym, x: +((e.clientX - r.left) / r.width).toFixed(4), y: +((e.clientY - r.top) / r.height).toFixed(4) });
   store.set('ibyeol-stamps-v1', a); drawStamps(page, n);
 });
@@ -1102,7 +1125,7 @@ function tryGesture(cv2, st) {
   const pts = st.p.map(q => cv2._norm ? [q[0] * r.width, q[1] * r.height] : [q[0], q[1]]);
   const g = recognize(pts); if (!g) return false;
   if (cv2._norm) {
-    const page = cv2._host, n = [...document.querySelectorAll('#scorePages .page')].indexOf(page); if (n < 0) return false;
+    const page = cv2._host, n = page.dataset.n; if (n == null) return false;
     const a = store.get('ibyeol-stamps-v1') || {}; (a[n] || (a[n] = [])).push({ s: g.s, x: +(g.ax / r.width).toFixed(4), y: +(g.ay / r.height).toFixed(4) });
     store.set('ibyeol-stamps-v1', a); drawStamps(page, n); undoStack.push({ type: 'stamp', n });
   } else {
@@ -1185,6 +1208,112 @@ function autoBreaths() {
   shToast(added ? '숨표 ' + added + '개를 찍었어요' : '새로 찍을 숨표가 없어요', added > 0);
 }
 $('autoBr').onclick = () => { if (!ly.lines.length) { shToast('먼저 가사를 넣어 주세요'); return; } autoBreaths(); };
+/* ---- auto score (simplified staff from the vocal melody) ---- */
+const QN = {"q":0.238039,"off":0.3572,"n":[[148,1,53],[150,2,55],[152,1,52],[153,5,53],[158,1,50],[159,3,52],[162,1,47],[163,3,48],[180,1,46],[181,3,48],[184,1,50],[185,1,52],[186,5,50],[191,1,51],[192,2,52],[194,1,46],[195,2,48],[212,1,55],[214,1,57],[216,1,53],[217,4,55],[221,2,53],[224,1,53],[225,3,55],[228,1,53],[229,1,55],[230,1,57],[231,2,48],[236,1,48],[238,1,50],[239,1,52],[240,1,50],[241,1,52],[242,5,50],[252,1,48],[254,1,50],[255,2,52],[257,2,50],[259,4,52],[263,1,53],[264,1,52],[266,1,48],[267,1,50],[268,1,49],[269,2,50],[276,1,52],[277,3,55],[280,1,52],[281,4,53],[285,3,55],[288,1,50],[290,1,50],[291,2,48],[293,1,47],[308,1,56],[309,4,57],[313,1,59],[314,3,52],[317,1,53],[318,1,60],[319,3,62],[322,1,59],[323,5,60],[340,1,56],[341,4,57],[345,6,59],[351,2,60],[354,1,53],[355,3,55],[358,1,57],[359,1,48],[365,2,50],[367,1,52],[368,1,50],[369,1,53],[371,2,50],[376,1,50],[377,1,52],[378,1,53],[379,1,48],[380,1,50],[381,1,49],[382,3,48],[387,1,44],[403,1,47],[404,2,48],[406,1,53],[407,3,55],[410,4,48],[414,1,53],[415,3,55],[418,1,54],[419,2,55],[436,1,47],[438,1,53],[439,2,55],[442,1,47],[443,2,48],[446,1,55],[447,2,57],[450,1,54],[451,5,55],[468,1,53],[469,2,55],[472,1,56],[473,4,57],[477,3,58],[480,3,60],[486,1,53],[487,1,52],[488,1,56],[489,1,58],[490,1,57],[491,3,58],[494,1,60],[495,1,58],[496,1,60],[497,6,58],[507,1,52],[508,1,53],[509,1,55],[510,1,57],[511,1,58],[512,1,57],[514,6,58],[522,2,60],[524,1,61],[525,2,62],[528,1,62],[532,1,63],[533,2,64],[535,1,63],[538,1,65],[539,1,60],[540,1,62],[543,1,61],[544,3,62],[549,1,60],[551,3,62],[560,1,60],[561,1,62],[563,1,61],[564,1,62],[565,2,61],[567,3,62],[572,1,57],[573,1,59],[574,1,60],[575,1,62],[576,1,64],[577,6,65],[583,1,64],[584,1,63],[585,5,64],[592,1,63],[593,1,62],[594,1,59],[595,3,60],[604,1,57],[606,1,59],[607,1,60],[608,1,64],[610,1,62],[611,5,60],[619,1,57],[620,1,59],[622,1,59],[623,3,60],[626,1,59],[627,7,60],[691,1,60],[692,1,53],[693,3,55],[696,1,52],[697,2,53],[700,1,53],[701,2,55],[704,2,50],[706,1,48],[707,1,47],[724,1,67],[725,3,57],[728,1,59],[730,3,52],[733,1,61],[734,1,62],[735,1,60],[736,2,62],[738,1,64],[739,1,59],[740,4,60],[757,4,57],[761,6,59],[767,1,60],[768,1,54],[769,3,55],[772,1,54],[773,1,55],[774,1,57],[780,1,48],[782,1,50],[784,1,50],[785,1,52],[786,1,51],[787,2,50],[789,2,48],[792,1,50],[793,1,52],[794,1,53],[795,1,48],[796,1,50],[797,5,48],[803,3,48],[806,1,44],[820,1,48],[822,1,53],[823,1,55],[824,1,53],[825,1,55],[827,1,47],[828,2,48],[830,1,53],[831,3,55],[834,1,54],[835,4,55],[852,2,48],[854,1,53],[856,2,55],[858,1,47],[859,3,48],[862,1,55],[863,3,57],[866,1,54],[867,6,55],[884,1,54],[885,4,55],[889,5,57],[894,2,58],[896,2,60],[898,1,59],[899,1,60],[903,1,53],[904,1,57],[905,1,58],[906,1,57],[907,3,58],[910,1,60],[911,1,58],[912,1,60],[913,2,58],[915,3,59],[918,1,58],[923,1,52],[924,1,53],[925,1,55],[926,1,57],[927,3,58],[930,1,57],[932,4,58],[937,4,60],[941,5,62],[948,1,63],[949,2,64],[951,1,62],[954,1,65],[955,1,61],[956,1,62],[959,1,61],[960,3,62],[964,2,60],[975,1,65],[977,1,62],[979,1,61],[980,1,62],[981,2,61],[983,1,62],[985,1,62],[990,1,60],[991,1,62],[993,1,64],[994,5,65],[999,1,64],[1000,1,63],[1001,2,64],[1004,3,64],[1008,1,64],[1009,1,62],[1010,2,60],[1013,2,60],[1020,1,56],[1022,1,59],[1023,1,60],[1025,2,62],[1030,2,60],[1034,1,57],[1035,2,59],[1038,1,65],[1039,1,66],[1040,2,67],[1042,1,66],[1046,16,67],[1063,1,67],[1064,1,69],[1065,2,67],[1067,1,64],[1068,1,65],[1069,3,64],[1072,1,63],[1073,1,62],[1074,6,60],[1085,1,57],[1086,1,59],[1088,1,62],[1090,1,62],[1091,1,60],[1094,1,60],[1098,1,57],[1099,4,59],[1103,3,60],[1106,1,59],[1107,7,60],[1116,1,60],[1120,5,60],[1162,1,57],[1163,3,59],[1166,1,66],[1167,3,67],[1170,1,66],[1171,18,67],[1191,1,67],[1192,1,69],[1193,2,67],[1199,1,64],[1201,1,62],[1202,2,60],[1205,1,60],[1212,1,56],[1213,1,57],[1214,1,59],[1215,2,60],[1217,1,63],[1218,1,62],[1220,1,59],[1221,3,60],[1233,1,60],[1234,1,58],[1235,2,59],[1237,3,60],[1240,1,59],[1241,4,60]]};
+const TPB = 16, SVGNS = 'http://www.w3.org/2000/svg';
+const SPELL = [['C', ''], ['C', '♯'], ['D', ''], ['E', '♭'], ['E', ''], ['F', ''], ['F', '♯'], ['G', ''], ['A', '♭'], ['A', ''], ['B', '♭'], ['B', '']];
+const LETTER = { C: 0, D: 1, E: 2, F: 3, G: 4, A: 5, B: 6 };
+let scoreGeo = null;
+function tickTime(tk) { return QN.off + tk * QN.q; }
+function syllableMap() {
+  // returns Map noteIndex -> {text, line, syl, k}
+  const map = new Map(); if (!ly.lines.length) return map;
+  const notes = QN.n.map((n, i) => ({ i, t: tickTime(n[0]), d: n[1] }));
+  const strength = t => { let best = 0; for (const o of ONS) { if (o[0] < t - 0.1) continue; if (o[0] > t + 0.1) break; best = Math.max(best, o[1] + Math.min(o[2], 1)); } return best; };
+  ly.lines.forEach((line, li) => {
+    const chars = Array.from(line), idx = chars.map((c, k) => /[가-힣A-Za-z0-9]/.test(c) ? k : -1).filter(k => k >= 0), c = idx.length; if (!c) return;
+    const s = (ly.times[li] || 0) - 0.15, e = li + 1 < ly.times.length ? ly.times[li + 1] - 0.15 : s + 12;
+    const inL = notes.filter(n => n.t >= s && n.t < e && !map.has(n.i)); if (!inL.length) return;
+    let starts;
+    if (inL.length >= c) {
+      const rest = inL.slice(1).map(n => ({ n, sc: strength(n.t) + (n.d >= 2 ? 0.15 : 0) })).sort((a, b) => b.sc - a.sc).slice(0, c - 1).map(x => x.n);
+      starts = [inL[0]].concat(rest).sort((a, b) => a.i - b.i);
+    } else starts = inL.slice();
+    starts.forEach((n, j) => {
+      const last = j === starts.length - 1;
+      const syl = last ? idx.slice(j) : [idx[j]];
+      map.set(n.i, { text: syl.map(k => chars[k]).join(''), line: li, ks: syl });
+    });
+  });
+  return map;
+}
+function renderGenScore() {
+  const host = $('genScore'); if (!host) return;
+  host.textContent = '';
+  const bars = new Map(); QN.n.forEach((n, i) => { const b = Math.floor(n[0] / TPB); if (!bars.has(b)) bars.set(b, []); bars.get(b).push(i); });
+  const used = [...bars.keys()].sort((a, b) => a - b); if (!used.length) return;
+  // slots: real bars, or one slot standing for a run of empty bars
+  const slots = []; let prev = used[0] - 1;
+  for (const b of used) { const gapN = b - prev - 1; if (gapN === 1) slots.push({ bar: prev + 1 }); else if (gapN > 1) slots.push({ rest: gapN, from: prev + 1 }); slots.push({ bar: b }); prev = b; }
+  const PER = 2, W = 420, LM = 30, SW = (W - LM - 6) / PER, LG = 8, TOP = 30, SH = 118;
+  const systems = Math.ceil(slots.length / PER), H = systems * SH + 10;
+  const svg = document.createElementNS(SVGNS, 'svg'); svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H); svg.setAttribute('class', 'gscore'); svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', '자동 악보');
+  const el = (tag, attrs, txt) => { const x = document.createElementNS(SVGNS, tag); for (const k in attrs) x.setAttribute(k, attrs[k]); if (txt != null) x.textContent = txt; svg.appendChild(x); return x; };
+  const syl = syllableMap(), scoreLyr = {};
+  const noteGeo = [];
+  const slotOf = new Map(); slots.forEach((s, si) => { if (s.bar != null) slotOf.set(s.bar, si); });
+  for (let sy = 0; sy < systems; sy++) {
+    const y0 = sy * SH + TOP, bottom = y0 + 4 * LG;
+    for (let l = 0; l < 5; l++) el('line', { x1: 4, x2: W - 4, y1: y0 + l * LG, y2: y0 + l * LG, class: 'st' });
+    el('text', { x: 6, y: bottom + 5, class: 'clef' }, '𝄞');
+    el('text', { x: 12, y: bottom + 16, class: 'oct' }, '8');
+    for (let k = 0; k < PER; k++) {
+      const si = sy * PER + k; if (si >= slots.length) break;
+      const sx = LM + k * SW, s = slots[si];
+      el('line', { x1: sx + SW, x2: sx + SW, y1: y0, y2: bottom, class: 'bl' });
+      if (s.rest) { el('rect', { x: sx + SW / 2 - 18, y: y0 + LG * 1.5, width: 36, height: LG, class: 'mrest' }); el('text', { x: sx + SW / 2, y: y0 - 6, class: 'bn mid' }, s.rest + '마디 쉼'); continue; }
+      el('text', { x: sx + 2, y: y0 - 6, class: 'bn' }, String(s.bar + 1));
+    }
+  }
+  QN.n.forEach((n, i) => {
+    const b = Math.floor(n[0] / TPB), si = slotOf.get(b); if (si == null) return;
+    const sy = Math.floor(si / PER), k = si % PER, y0 = sy * SH + TOP, bottom = y0 + 4 * LG, sx = LM + k * SW;
+    const pos = (n[0] % TPB) / TPB, x = sx + 8 + pos * (SW - 16);
+    let len = n[1] / TPB * (SW - 16); const maxLen = sx + SW - 2 - x; const over = len > maxLen; if (over) len = maxLen;
+    const pc = ((n[2] % 12) + 12) % 12, sp = SPELL[pc], oct = Math.floor(n[2] / 12) - 1 + 1; // written an octave up
+    const step = LETTER[sp[0]] + 7 * oct - (2 + 7 * 4), y = bottom - step * LG / 2;
+    for (let st = -2; st >= step; st -= 2) el('line', { x1: x - 6, x2: x + 6, y1: bottom - st * LG / 2, y2: bottom - st * LG / 2, class: 'st' });
+    for (let st = 10; st <= step; st += 2) el('line', { x1: x - 6, x2: x + 6, y1: bottom - st * LG / 2, y2: bottom - st * LG / 2, class: 'st' });
+    el('rect', { x: x, y: y - 1.2, width: Math.max(2, len), height: 2.4, rx: 1.2, class: 'dur' + (over ? ' tie' : '') });
+    const head = el('ellipse', { cx: x, cy: y, rx: 4.3, ry: 3.2, transform: 'rotate(-20 ' + x + ' ' + y + ')', class: 'nh' });
+    if (sp[1]) el('text', { x: x - 11, y: y + 3.5, class: 'acc sm' }, sp[1]);
+    const sm = syl.get(i);
+    if (sm) {
+      const lsy = scoreLyr[sy] || (scoreLyr[sy] = { x: -99, alt: 0 }); lsy.alt = (x - lsy.x < 12) ? 1 - lsy.alt : 0; lsy.x = x;
+      el('text', { x: x, y: bottom + 24 + lsy.alt * 11, class: 'lyr' }, sm.text);
+      const br = new Set(ly.breaths[sm.line] || []), mk = (ly.marks && ly.marks[sm.line]) || {};
+      for (const kk of sm.ks) { if (mk[kk] && SYMS[mk[kk]]) el('text', { x: x, y: y0 - 14, class: 'mk mid' }, SYMS[mk[kk]].g); }
+      const lastK = sm.ks[sm.ks.length - 1];
+      let nextSylK = Infinity; const lineIdx = Array.from(ly.lines[sm.line]).map((c, kk) => /[가-힣A-Za-z0-9]/.test(c) ? kk : -1).filter(kk => kk > lastK); if (lineIdx.length) nextSylK = lineIdx[0];
+      for (const bk of br) if (bk >= lastK && bk < nextSylK) { sm.breathAfter = true; }
+      if (sm.breathAfter) el('text', { x: Math.min(sx + SW - 4, x + Math.max(10, len) + 3), y: y0 - 3, class: 'br2' }, 'V');
+    }
+    noteGeo.push({ i, t0: tickTime(n[0]), t1: tickTime(n[0] + n[1]), x, len, sy, head });
+  });
+  const ph = el('line', { x1: -10, x2: -10, y1: 0, y2: 0, class: 'ph' });
+  scoreGeo = { svg, noteGeo, ph, SH, TOP, LG, W, H, slots, slotOf, PER, SW, LM, lastOn: null };
+  const page = document.createElement('div'); page.className = 'page gpage'; page.dataset.n = 'g';
+  page.appendChild(svg);
+  const stamps = document.createElement('div'); stamps.className = 'stamps'; page.appendChild(stamps);
+  host.appendChild(page);
+  attachInk(page, 'G:auto', true); drawStamps(page, 'g');
+}
+function updScoreNow(t) {
+  if (!scoreGeo || $('sheet').hidden || shView !== 'score') return;
+  const g4 = scoreGeo, b = Math.floor((t - QN.off) / QN.q / TPB), si = g4.slotOf.get(b);
+  if (si == null) { g4.ph.setAttribute('x1', -10); g4.ph.setAttribute('x2', -10); }
+  else {
+    const sy = Math.floor(si / g4.PER), k = si % g4.PER, sx = g4.LM + k * g4.SW, pos = (((t - QN.off) / QN.q) % TPB) / TPB, x = sx + 8 + pos * (g4.SW - 16), y0 = sy * g4.SH + g4.TOP;
+    g4.ph.setAttribute('x1', x); g4.ph.setAttribute('x2', x); g4.ph.setAttribute('y1', y0 - 10); g4.ph.setAttribute('y2', y0 + 4 * g4.LG + 30);
+    if (playing && shMode === 'view' && Date.now() - lastTouch > 3000 && g4.lastSys !== sy) {
+      g4.lastSys = sy; const r = g4.svg.getBoundingClientRect(), body = $('scoreBody'), br2 = body.getBoundingClientRect();
+      const yPx = r.top + (y0 / g4.H) * r.height - br2.top + body.scrollTop - br2.height * 0.3;
+      body.scrollTo({ top: Math.max(0, yPx), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    }
+  }
+  let on = null; for (const n of g4.noteGeo) { if (t >= n.t0 && t < n.t1) { on = n; break; } }
+  if (on !== g4.lastOn) { if (g4.lastOn) g4.lastOn.head.classList.remove('on'); if (on) on.head.classList.add('on'); g4.lastOn = on; }
+}
 let sheetLine = -2, lastTouch = 0;
 $('shBody').addEventListener('touchstart', () => lastTouch = Date.now(), { passive: true });
 $('shBody').addEventListener('wheel', () => lastTouch = Date.now(), { passive: true });
@@ -1276,6 +1405,7 @@ function frame(now) {
   else { st.textContent = ''; st.className = ''; }
   if (now - lastSeekUpd > 200) { lastSeekUpd = now; $('seek').value = t.toFixed(1); $('timeTxt').textContent = fmt(t) + ' / 5:27'; if (!$('sheet').hidden) $('shTime').textContent = fmt(t); }
   updMelNow(t);
+  updScoreNow(t);
   requestAnimationFrame(frame);
 }
 try { const tb = sessionStorage.getItem('ibyeol-tab'); if (tb) showTab(tb); } catch (e) {}
