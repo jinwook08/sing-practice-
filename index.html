@@ -299,6 +299,7 @@ input[type=file]{font:inherit;font-size:14px;max-width:100%}
     <div class="row">
       <button class="play" id="shPlay" aria-label="재생">▶</button>
       <h2>가사창</h2>
+      <label class="btn primary" for="pickMr" id="shPick" hidden>MR 파일 고르기</label>
       <span class="time" id="shTime">0:00</span>
       <button class="btn" id="shClose">닫기</button>
     </div>
@@ -399,11 +400,11 @@ function cur() {
 function place(a, k, t) { const x = Math.max(0, k === 'me' ? t - meOffset : t); if (a.readyState < 1) { a.addEventListener('loadedmetadata', () => { try { a.currentTime = x; } catch (e) {} }, { once: true }); return; } try { a.currentTime = x; } catch (e) {} }
 function setPlaying(on) {
   const a = audios[src];
-  if (on && !a._has && src !== 'me') { $('setup').hidden = false; $('loadTxt').textContent = '먼저 반주 파일을 골라 주세요.'; $('setup').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+  if (on && !a._has && src !== 'me') { if (!$('sheet').hidden) { $('shPick').hidden = false; shToast('이 기기에 반주가 아직 없어요. 위의 "MR 파일 고르기"로 MR을 골라 주세요'); return; } $('setup').hidden = false; $('loadTxt').textContent = '먼저 반주 파일을 골라 주세요.'; $('setup').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
   if (on) {
     place(a, src, viewT);
     $('loadTxt').textContent = '반주 불러오는 중…';
-    const pr = a.play(); if (pr) pr.catch(() => { playing = false; updBtn(); $('loadTxt').textContent = '재생이 안 됐어요. ▶를 한 번 더 눌러 보세요.'; if (a._file && !a._blob) { a._blob = true; fetch(a._file).then(r => r.blob()).then(b => { a.src = URL.createObjectURL(b); }).catch(() => {}); } });
+    const pr = a.play(); if (pr) pr.catch(() => { playing = false; updBtn(); if (!$('sheet').hidden) shToast('소리를 재생하지 못했어요. ▶를 한 번 더 눌러 주세요'); $('loadTxt').textContent = '재생이 안 됐어요. ▶를 한 번 더 눌러 보세요.'; if (a._file && !a._blob) { a._blob = true; fetch(a._file).then(r => r.blob()).then(b => { a.src = URL.createObjectURL(b); }).catch(() => {}); } });
     playing = true; wake();
   } else { if (playing) viewT = cur(); a.pause(); playing = false; }
   updBtn();
@@ -461,6 +462,7 @@ function updSetup() {
   $('setupTxt').textContent = (m ? 'MR 준비됨' : 'MR 없음') + ' · ' + (r ? '원곡 준비됨' : '원곡 없음 (없어도 돼요)');
   $('setup').hidden = m && r ? true : m ? $('setup').dataset.open !== '1' : false;
   $('changeFiles').hidden = !m;
+  if ($('shPick')) $('shPick').hidden = m;
   $('loadTxt').textContent = m ? '▶를 누르면 반주가 나와요' : '먼저 반주 파일을 골라 주세요';
 }
 for (const k of ['mr', 'ar']) $(k === 'mr' ? 'pickMr' : 'pickAr').onchange = async e => { const f = e.target.files[0]; if (!f) return; if (playing) setPlaying(false); usePicked(k, f); await idbPut(k, f); };
