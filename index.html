@@ -65,6 +65,9 @@ label.btn{display:inline-block}
 .sheet-body{flex:1;overflow-y:auto;padding-top:12px;padding-bottom:calc(40vh + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .sl{display:flex;gap:12px;align-items:baseline;padding:10px 8px;border-radius:10px;cursor:pointer}
 .sl .t{font-family:var(--f-mono);font-size:12px;color:var(--muted);flex:none;width:40px;font-variant-numeric:tabular-nums}
+.sl .play-line{position:relative;z-index:5;width:auto;min-width:58px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);padding:5px 6px;cursor:pointer;align-self:center;font-size:13px}
+.sl .play-line:active{background:var(--amber-soft)}
+.sl.cur .play-line{border-color:var(--amber)}
 .sl .x{flex:1;min-width:0;font-size:20px;line-height:2.3;overflow-wrap:anywhere;color:var(--muted)}
 .sl.cur{background:var(--amber-soft)} .sl.cur .x{color:var(--ink);font-weight:700}
 .sl.inloop{outline:2px solid var(--amber)}
@@ -925,7 +928,7 @@ function setShMode(m) {
   $('sheet').classList.toggle('inking', m === 'pen');
   $('sheet').classList.toggle('finger', m === 'pen' && fingerDraw);
   $('shHint').textContent = m === 'view' ? '줄을 누르면 그 줄부터 들려줘요. 기호나 펜을 고르면 가사와 악보에 표시할 수 있어요.'
-    : m === 'sym' ? (shView === 'lyrics' ? '기호를 고르고 글자 칸을 누르세요. 숨(V)은 누른 글자 뒤에, 나머지는 글자 위에 붙어요. 같은 기호로 한 번 더 누르면 지워져요.' : '기호를 고르고 악보 위를 누르면 그 자리에 찍혀요. 찍힌 기호를 누르면 지워져요.')
+    : m === 'sym' ? (shView === 'lyrics' ? '기호를 고르고 글자 칸을 누르세요. 숨(V)은 누른 글자 뒤에, 나머지는 글자 위에 붙어요. 같은 기호로 한 번 더 누르면 지워져요. 왼쪽 ▶를 누르면 그 줄부터 들려줘요.' : '기호를 고르고 악보 위를 누르면 그 자리에 찍혀요. 찍힌 기호를 누르면 지워져요.')
     : '펜슬로 바로 쓰면 돼요. V, 물결(〰), 대각선(↗ ↘), <, > 를 한 번에 그리면 기호로 바뀌어요. 손가락으로는 화면이 넘어가고, 손가락으로도 쓰려면 "손가락 쓰기"를 켜세요.';
 }
 $('mView').onclick = () => setShMode('view');
@@ -1096,7 +1099,8 @@ function renderSheet() {
   if (!ly.lines.length) { const p = document.createElement('p'); p.className = 'note'; p.textContent = '"가사" 탭에 가사를 붙여넣으면 여기에 나와요.'; B.appendChild(p); return; }
   ly.lines.forEach((l, i) => {
     const r = document.createElement('div'); r.className = 'sl'; r.dataset.i = i;
-    const tt = document.createElement('span'); tt.className = 't'; tt.textContent = fmt(ly.times[i] || 0);
+    const tt = document.createElement('button'); tt.className = 't play-line'; tt.textContent = '▶ ' + fmt(ly.times[i] || 0); tt.setAttribute('aria-label', (i + 1) + '번째 줄부터 듣기');
+    tt.onclick = e => { e.stopPropagation(); if (loop && loop.line >= 0) loopLine(i); else { seekTo((ly.times[i] || 0) - 0.8); if (!playing) setPlaying(true); } };
     const xw = document.createElement('div'); xw.className = 'xw';
     const x = document.createElement('div'); x.className = 'x'; renderLine(x, i); xw.appendChild(x);
     if (showMel) { const m3 = document.createElement('canvas'); m3.className = 'mel'; m3.setAttribute('aria-hidden', 'true'); xw.appendChild(m3); }
@@ -1605,7 +1609,7 @@ async function initCloud() {
 initCloud();
 
 /* ---------- new version check (hosted) ---------- */
-const BUILD = '1793261951';
+const BUILD = '1793262146';
 async function checkUpdate() {
   if (!HOSTED) return;
   try {
