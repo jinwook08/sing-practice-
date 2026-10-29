@@ -107,7 +107,7 @@ canvas.mel{display:block;width:100%;height:50px}
 .gscore .nh{fill:var(--ink)} .gscore .nh.on{fill:var(--off)}
 .gscore .dur{fill:var(--note)} .gscore .dur.tie{opacity:.6}
 .gscore text{font-family:var(--f-body)}
-.gscore .lyr{font-size:9.5px;fill:var(--ink);text-anchor:middle}
+.gscore .lyr{font-size:9.5px;fill:var(--ink);text-anchor:middle} .gscore .lyr.tight{font-size:8px}
 .gscore .clef{font-size:34px;fill:var(--ink);font-family:"Apple Symbols","Noto Music","Segoe UI Symbol","Bravura",serif}
 .gscore .oct{font-size:7px;fill:var(--ink)}
 .gscore .acc{font-size:10px;fill:var(--ink)} .gscore .acc.sm{font-size:9px}
@@ -1333,8 +1333,8 @@ function renderGenScore() {
     if (sp[1]) el('text', { x: x - 11, y: y + 3.5, class: 'acc sm' }, sp[1]);
     const sm = syl.get(i);
     if (sm) {
-      const lsy = scoreLyr[sy] || (scoreLyr[sy] = { x: -99, alt: 0 }); lsy.alt = (x - lsy.x < 12) ? 1 - lsy.alt : 0; lsy.x = x;
-      el('text', { x: x, y: bottom + 24 + lsy.alt * 11, class: 'lyr' }, sm.text);
+      const lsy = scoreLyr[sy] || (scoreLyr[sy] = { x: -99 }); const wTxt = 8.6 * Array.from(sm.text).length; const tx = Math.max(x, lsy.x + 4.6 + wTxt / 2); lsy.x = tx + wTxt / 2 - 4.3;
+      el('text', { x: tx, y: bottom + 25, class: 'lyr' }, sm.text);
       const br = new Set(ly.breaths[sm.line] || []), mk = (ly.marks && ly.marks[sm.line]) || {};
       for (const kk of sm.ks) { if (mk[kk] && SYMS[mk[kk]]) el('text', { x: x, y: y0 - 14, class: 'mk mid s-' + mk[kk] }, SYMS[mk[kk]].g); }
       const lastK = sm.ks[sm.ks.length - 1];
@@ -1389,16 +1389,19 @@ function paintStamps(g5, list, W5, H5) {
 }
 function loadImg(src) { return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; }); }
 async function svgToImage(svg) {
-  const clone = svg.cloneNode(true), src = svg.querySelectorAll('*'), dst = clone.querySelectorAll('*');
-  const keys = ['fill', 'stroke', 'stroke-width', 'opacity', 'font-size', 'font-family', 'font-weight', 'text-anchor'];
-  const root = document.documentElement, prevTheme = root.getAttribute('data-theme');
-  root.setAttribute('data-theme', 'light');
-  src.forEach((el, i) => {
-    const cs = getComputedStyle(el); let st = '';
-    for (const k of keys) { let v = cs.getPropertyValue(k); if (!v) continue; st += k + ':' + v + ';'; }
-    dst[i].setAttribute('style', st);
+  const clone = svg.cloneNode(true), dst = clone.querySelectorAll('*');
+  const PS = { st: 'stroke:#6b7480;stroke-width:.6', bl: 'stroke:#6b7480;stroke-width:.8', nh: 'fill:#17202C', dur: 'fill:#E9A825', lyr: 'fill:#17202C;font-size:9.5px;text-anchor:middle', clef: 'fill:#17202C;font-size:34px', oct: 'fill:#17202C;font-size:7px', acc: 'fill:#17202C;font-size:10px', bn: 'fill:#6b7480;font-size:7px', mrest: 'fill:#17202C', mk: 'font-size:11px;font-weight:700;fill:#B87800', br2: 'font-size:11px;font-weight:700;fill:#2463D6' };
+  const SC = { 's-vib': '#8443D1', 's-up': '#D0461F', 's-dn': '#D0461F', 's-cre': '#16834F', 's-dim': '#16834F' };
+  dst.forEach(n => {
+    const cl = (n.getAttribute('class') || '').split(/\s+/); let st = 'font-family:"IBM Plex Sans KR","Apple SD Gothic Neo",sans-serif;';
+    for (const c of cl) { if (PS[c]) st += PS[c] + ';'; }
+    if (cl.includes('mid')) st += 'text-anchor:middle;';
+    if (cl.includes('sm')) st += 'font-size:9px;';
+    if (cl.includes('tight')) st += 'font-size:8px;';
+    if (cl.includes('tie')) st += 'opacity:.6;';
+    for (const c of cl) if (SC[c]) st += 'fill:' + SC[c] + ';';
+    n.setAttribute('style', st);
   });
-  if (prevTheme == null) root.removeAttribute('data-theme'); else root.setAttribute('data-theme', prevTheme);
   clone.querySelectorAll('.ph').forEach(n => n.remove());
   clone.querySelectorAll('.nh.on').forEach(n => n.classList.remove('on'));
   const vb = svg.viewBox.baseVal, scale = 1240 / vb.width;
@@ -1595,7 +1598,7 @@ async function initCloud() {
 initCloud();
 
 /* ---------- new version check (hosted) ---------- */
-const BUILD = '1793246055';
+const BUILD = '1793246318';
 async function checkUpdate() {
   if (!HOSTED) return;
   try {
