@@ -240,6 +240,7 @@ input[type=file]{font:inherit;font-size:14px;max-width:100%}
     <button class="btn" id="lnNext" aria-label="다음 줄">다음 줄 ▶</button>
     <label class="check"><input type="checkbox" id="altMode"> AR 듣고 → MR로 부르기</label>
     <button class="btn" id="openSheet">가사창 (숨표)</button>
+    <button class="btn" id="mainExport">표시한 악보 PDF</button>
   </div>
 
   <nav class="tabs" role="tablist">
@@ -318,6 +319,7 @@ input[type=file]{font:inherit;font-size:14px;max-width:100%}
       <h2>가사창</h2>
       <label class="btn primary" for="pickMr" id="shPick" hidden>MR 파일 고르기</label>
       <span class="time" id="shTime">0:00</span>
+      <button class="btn" id="shExport">PDF</button>
       <button class="btn" id="shReload" aria-label="새로고침">↻</button>
       <button class="btn" id="shClose">닫기</button>
     </div>
@@ -1488,7 +1490,7 @@ async function openExport() {
   for (const c of exportPages) { const im = document.createElement('img'); im.src = c.toDataURL('image/jpeg', 0.85); im.alt = '표시한 악보'; im.className = 'expimg'; list.appendChild(im); }
   msg.textContent = exportPages.length + '쪽이에요. "PDF로 저장"을 누르거나, 이미지를 길게 눌러 사진에 저장할 수 있어요.';
 }
-$('openExport').onclick = openExport;
+$('openExport').onclick = openExport; $('shExport').onclick = openExport; $('mainExport').onclick = openExport;
 $('expAuto').onchange = () => { $('expAuto').dataset.touched = '1'; openExport(); };
 $('expClose').onclick = () => { $('exportView').hidden = true; };
 $('expPdf').onclick = async () => {
@@ -1593,7 +1595,7 @@ async function initCloud() {
 initCloud();
 
 /* ---------- new version check (hosted) ---------- */
-const BUILD = '1793245907';
+const BUILD = '1793246055';
 async function checkUpdate() {
   if (!HOSTED) return;
   try {
